@@ -1,0 +1,223 @@
+CoAID,AccountCode,AccountName,AccountType,BalanceSide,Status,AddDate,ModifiedDate,ARAP,ARAPType
+1,11101001,Tiền mặt VN - VND,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+2,11102001,Tiền mặt CA - CAD,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+3,11201001,Bank VN - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+4,11201002,Bank VN - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+5,11201003,Bank VN - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+6,11202001,Bank CA - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+7,11202002,Bank CA - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+8,11202003,Bank CA - Theo ngân hàng + số tài khoản,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+9,11202051,PayPal - Available (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+10,11202052,PayPal - Held/Reserve/Review (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+11,11202053,PayPal - Available (CAD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+12,11202054,PayPal - Held/Reserve (CAD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+13,11202061,PingPong - Available (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+14,11202062,PingPong - Pending/Reserve (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+15,11202071,Payoneer - Available (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+16,11202081,Stripe - Available (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+17,11202082,Stripe - Pending/Reserve (USD),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+18,11301001,Rút PayPal về Bank VN - đang chuyển,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+19,11302001,Rút PayPal về Bank CA - đang chuyển,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+20,11303001,Rút PayPal về PingPong - đang chuyển,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+21,11304001,Rút PingPong về Bank VN - đang chuyển,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+22,12101001,Chứng khoán kinh doanh - Cổ phiếu/ETF/Trái phiếu trading,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+23,12101002,Chứng khoán kinh doanh khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+24,12810101,Tiền gửi có kỳ hạn ≤ 3 tháng,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+25,12810102,Tiền gửi có kỳ hạn > 3 tháng đến 12 tháng,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+26,12810103,Tiền gửi có kỳ hạn > 12 tháng,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+27,12820101,Trái phiếu nắm giữ đến ngày đáo hạn,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+28,12830101,Cho vay ngắn hạn,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+29,12830102,Cho vay dài hạn,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+30,12880101,Đầu tư khác nắm giữ đến ngày đáo hạn,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+31,13111001,Phải thu khách hàng (VN),A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+32,13111002,Phải thu khách hàng VN - Giải pháp phần mềm / license,A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+33,13111003,Phải thu khách hàng VN - SaaS / bảo trì / support,A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+34,13112001,Phải thu khách hàng (Global/CA),A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+35,13112002,Phải thu khách hàng Global/CA - Giải pháp phần mềm / license,A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+36,13112003,Phải thu khách hàng Global/CA - SaaS / bảo trì / support,A,Dr,Active,48:55.8,48:55.8,AR,Receivables from Customers
+37,13121001,Người mua trả tiền trước - VN,A,Dr,Active,48:55.8,48:55.8,AR,Advances from Customers
+38,13122001,Người mua trả tiền trước - Global/CA,A,Dr,Active,48:55.8,48:55.8,AR,Advances from Customers
+39,13310001,"Thuế GTGT trả lại nhà c.cấp, giảm giá hàng mua: HĐ SXKD",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+40,13600001,Phải thu nội bộ giữa các entity,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+41,13801001,Phải thu khác - Tạm ứng/đặt cọc (VN),A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+42,13801002,Phải thu khác - Ký quỹ/đặt cọc dịch vụ,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+43,13802001,Phải thu khác - Chargeback/Dispute chờ xử lý (PayPal),A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+44,13802002,Phải thu khác - Reimbursement từ PSP / platform,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+45,13802003,Phải thu khác - Lãi tiền gửi dự thu,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+46,13802004,Phải thu khác - Lãi cho vay dự thu,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+47,13802005,Phải thu khác - Cổ tức/lợi nhuận được chia,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+48,13802006,Phải thu khác - Chargeback/dispute được hoàn,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+49,13889001,Phải thu khác ngắn hạn,A,Dr,Active,48:55.8,48:55.8,AR,Other receivables
+50,14101001,Tạm ứng nhân viên - VN,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+51,14102001,Tạm ứng nhân viên - CA,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+52,15301001,CCDC - VN,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+53,15401001,Tập hợp chi phí tính giá thành,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+54,15602001,Hàng hóa,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+55,21110010,"TSCĐHH - Nguyên giá - Nhà cửa, vật kiến trúc",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+56,21120010,"TSCĐHH - Nguyên giá - Máy móc, thiết bị",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+57,21130010,"TSCĐHH - Nguyên giá - Phương tiện vận tải, thiết bị truyền dẫn",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+58,21140010,"TSCĐHH - Nguyên giá - Thiết bị, dụng cụ quản lý",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+59,21150010,"TSCĐHH - Nguyên giá - Cây lâu năm, súc vật làm việc và cho sản phẩm",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+60,21180010,TSCĐHH - Nguyên giá - Tài sản cố định khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+61,21310010,TSCĐVH - Nguyên giá - Quyền sử dụng đất,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+62,21320010,TSCĐVH - Nguyên giá - Quyền phát hành,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+63,21330010,"TSCĐVH - Nguyên giá - Bản quyền, bằng sáng chế",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+64,21340010,TSCĐVH - Nguyên giá - Nhãn hiệu hàng hóa,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+65,21350010,TSCĐVH - Nguyên giá - Phần mềm máy vi tính,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+66,21360010,TSCĐVH - Nguyên giá - Giấy phép và giấy phép nhượng quyền,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+67,21380010,TSCĐVH - Nguyên giá - Tài sản cố định vô hình khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+68,21411010,"TSCĐHH - HMLK - Nhà cửa, vật kiến trúc",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+69,21412010,TSCĐHH - HMLK - Máy móc thiết bị,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+70,21413010,"TSCĐHH - HMLK -  Phương tiện vận tải, thiết bị truyền dẫn",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+71,21414010,TSCĐHH - HMLK -  Thiết bị dụng cụ quản lý,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+72,21415010,"TSCĐHH - HMLK - Cây lâu năm, súc vật làm việc và cho sản phẩm",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+73,21418010,TSCĐHH - HMLK - Tài sản cố định khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+74,21432010,TSCĐ VH - HMLK - Quyền phát hành,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+75,21433010,"TSCĐ VH - HMLK - Bản quyền, bằng sáng chế",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+76,21434010,"TSCĐ VH - HMLK - Nhãn hiệu, tên thương mại",A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+77,21435010,TSCĐ VH - HMLK - Phần mềm,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+78,21436010,TSCĐ VH - HMLK - Giấy phép và giấy phép nhượng quyền,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+79,21438010,TSCĐ VH - HMLK - TSCĐ vô hình khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+80,22110010,Đầu tư vào Công ty con,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+81,22920010,Dự phòng tổn thất đầu tư vào đơn vị khác (VN),A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+82,22920020,Dự phòng tổn thất đầu tư vào Công ty LDLK,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+83,22920090,Dự phòng tổn thất đầu tư vào đơn vị khác,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+84,22930001,Dự phòng phải thu khó đòi,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+85,22940001,Dự phòng giảm giá hàng tồn kho,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+86,24201001,Chi phí trả trước - Thuê văn phòng VN,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+87,24201002,Chi phí trả trước - Dịch vụ (SaaS/Tools) VN,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+88,24202001,Chi phí trả trước - Tư vấn/thuê ngoài CA,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+89,24300001,Tài sản thuế TNDN hoãn lại,A,Dr,Active,48:55.8,48:55.8,NULL,NULL
+90,33102001,Phải trả Seller - Share profit/Payout,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+91,33102002,Phải trả Supplier - COGS/fulfillment,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+92,33102003,Phải trả tư vấn - CA,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+93,33102004,Phải trả marketplace / platform commission,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+94,33102005,Phải trả PSP / payment gateway,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+95,33102006,Phải trả affiliate / KOL / agency,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+96,33102007,Phải trả outsource IT,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+97,33102008,Phải trả cloud / hosting / license vendor,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+98,33102009,Phải trả SaaS / tools / office software,L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+99,33111001,Phải trả NCC (VND),L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+100,33111002,Phải trả NCC (USA)),L,Cr,Active,48:55.8,48:55.8,AP,Payable to Suppliers
+101,33121001,Trả trước NCC (VND),L,Cr,Active,48:55.8,48:55.8,AP,Advance to Suppliers
+102,33121002,Trả trước NCC (USA)),L,Cr,Active,48:55.8,48:55.8,AP,Advance to Suppliers
+103,33200001,"Phải trả cổ tức, lợi nhuận",L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+104,33300001,Thuế khác phải nộp,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+105,33301001,Thuế GTGT phải nộp (VN),L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+106,33301004,Thuế nhà thầu (VN),L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+107,33302001,Thuế phải nộp CA (GST/HST/Payroll tax nếu phát sinh),L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+108,33340001,Thuế TNDN phải nộp,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+109,33350001,Thuế TNCN phải nộp,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+110,33401001,Lương phải trả - VN,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+111,33402001,Lương phải trả - CA,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+112,33502001,Chi phí phải trả,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+113,33600001,Phải trả nội bộ giữa các entity,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+114,33801001,BHXH/BHYT/BHTN phải nộp - VN (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+115,33801002,KPCĐ/Công đoàn phải nộp - VN (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+116,33802001,Các khoản khấu trừ lương - CA (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+117,33802060,Phải trả khác - Khoản giữ lại/khác liên quan PayPal,L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+118,33831001,BHXH phải nộp - VN (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+119,33841001,BHYT phải nộp - VN (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+120,33861001,BHTN phải nộp - VN (nếu có),L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+121,33889001,Phải trả khác ngắn hạn,L,Cr,Active,48:55.8,48:55.8,AP,Other payables
+122,34700001,Thuế TNDN hoãn lại phải trả,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+123,35201001,Dự phòng phải trả khác,L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+124,35202001,Dự phòng tranh chấp/chargeback (theo policy),L,Cr,Active,48:55.8,48:55.8,NULL,NULL
+125,41100001,Vốn góp chủ sở hữu,E,Cr,Active,48:55.8,48:55.8,NULL,NULL
+126,41300001,Chênh lệch tỷ giá hối đoái,E,Cr,Active,48:55.8,48:55.8,NULL,NULL
+127,42110001,LNST chưa phân phối lũy kế đến cuối năm trước,E,Cr,Active,48:55.8,48:55.8,NULL,NULL
+128,42120001,LNST chưa phân phối năm nay,E,Cr,Active,48:55.8,48:55.8,NULL,NULL
+129,51111001,Doanh thu bán hàng - VN (nếu có),R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+130,51111002,Doanh thu bán phần mềm / license - VN,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+131,51112001,Doanh thu bán hàng - Global (từ nền tảng),R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+132,51112002,Doanh thu bán phần mềm / license - Global,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+133,51121001,Doanh thu bán hàng - CA (nếu có),R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+134,51121002,Doanh thu bán phần mềm / license - CA,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+135,51131001,Doanh thu dịch vụ - Shipping cost,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+136,51131002,Doanh thu dịch vụ triển khai / customization phần mềm,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+137,51131003,Doanh thu dịch vụ bảo trì / support / AMC,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+138,51131004,Doanh thu subscription / SaaS,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+139,51131005,Doanh thu tư vấn / tích hợp công nghệ,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+140,51500001,Doanh thu tài chính - Lãi chênh lệch tỷ giá đã thực hiện,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+141,51500002,Doanh thu tài chính khác,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+142,51510012,Lãi tiền gửi,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+143,51510013,Lãi cho vay,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+144,51510014,Lãi từ trái phiếu / HTM,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+145,51510015,"Cổ tức, lợi nhuận được chia",R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+146,51530011,Lãi CLTG đánh giá lại cuối kỳ - các khoản phải thu,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+147,51530012,Lãi CLTG đánh giá lại cuối kỳ - các khoản phải trả,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+148,51530013,Lãi CLTG đánh giá lại cuối kỳ - Tiền,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+149,52100001,Các khoản giảm trừ doanh thu,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+150,52102001,Giảm trừ doanh thu - Refund/Return/Price concession (Global),R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+151,62202001,Chi phí nhân công trực tiếp,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+152,62702001,Chi phí dụng cụ sản xuất,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+153,62702002,Chi phí khấu hao TSCĐ,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+154,62702003,Chi phí dịch vụ mua ngoài,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+155,62702004,Chi phí khác bằng tiền,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+156,63202001,Giá vốn - SellerCost (chia sẻ cho Seller),Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+157,63202002,Giá vốn - SupplierCost (nhà cung cấp),Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+158,63202003,Giá vốn - Fulfillment/COGS khác,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+159,63203001,Giá vốn dịch vụ phần mềm - Nhân sự triển khai trực tiếp,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+160,63203002,Giá vốn dịch vụ phần mềm - Outsource triển khai,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+161,63203003,Giá vốn dịch vụ phần mềm - Cloud/license resale trực tiếp,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+162,63500001,Chi phí tài chính - Lỗ chênh lệch tỷ giá đã thực hiện,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+163,63510010,Lãi đi vay,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+164,63530011,Lỗ CLTG đánh giá lại cuối kỳ - các khoản phải thu,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+165,63530012,Lỗ CLTG đánh giá lại cuối kỳ - các khoản phải trả,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+166,63530013,Lỗ CLTG đánh giá lại cuối kỳ - Tiền,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+167,64102001,Chi phí Contest,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+168,64102002,Chi phí đầu tư nước ngoài,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+169,64102003,"Chi phí lương, thưởng",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+170,64102004,Chi phí BHXH,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+171,64102005,"Chi phí Phúc lợi (teambuiding, Hiếu, hỉ, khác)",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+172,64102006,Chi phí Khấu hao TSCĐ hữu hình,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+173,64102007,Chi phí Khấu hao TSCĐ vô hình (Domain),Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+174,64102008,Chi phí Phân bổ CCDC,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+175,64102009,"Chi phí MKT, quảng cáo",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+176,64102010,Chi phí nền tảng / AWS / ZOHO / Server / vận hành cổng,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+177,64102011,"Thuế, phí, lệ phí khác",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+178,64102012,Chi phí bán hàng - ShippingCost,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+179,64102013,Chi phí bán hàng - Dispute loss,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+180,64102015,Chi phí Cashback,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+181,64102016,Chi phí duy trì tài khoản,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+182,64102017,Chi phí CS mail / môi giới / affiliate,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+183,64102018,Chi phí outsourcing IT phục vụ bán hàng,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+184,64102099,Chi phí khác chưa được phân vào đâu,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+185,64200001,Chi phí QLDN - Khấu hao TSCĐ,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+186,64200002,Chi phí QLDN - Phân bổ trả trước (242),Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+187,64200020,Chi phí QLDN - Phí ngân hàng/chuyển tiền,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+188,64201002,"Chi phí QLDN - Lương, thưởng, phúc lợi - VN (quản lý)",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+189,64201003,Chi phí BHXH,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+190,64201004,"Chi phí phúc lợi (teambuiding, Hiếu, hỉ, khác)",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+191,64201006,Chi phí khấu hao TSCĐ hữu hình,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+192,64201007,Chi phí khấu hao TSCĐ vô hình (Domain),Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+193,64201008,Chi phí phân bổ CCDC,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+194,64201009,Chi Thiện nguyện,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+195,64201010,"Chi phí văn phòng: VPP, ...",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+196,64201012,"Phí AWS, ZOHO, Sever…",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+197,64201013,"Chi phí điện, nước, gửi xe, phí quản lý",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+198,64201014,Công tác phí,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+199,64201015,"Thuế, phí, lệ phí khác",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+200,64201016,Chi phí đào tạo,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+201,64201017,"Chi phí QLDN - Điện, nước, internet, điện thoại",Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+202,64201018,Chi phí đầu tư nước ngoài,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+203,64201019,Chi phí QLDN - Thuê văn phòng,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+204,64201020,Chi phí cố vấn / tư vấn,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+205,64201021,Chi phí bảo hiểm,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+206,64201022,Chi phí pháp lý / tuân thủ,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+207,64201023,Chi phí outsource IT backoffice,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+208,64201099,Chi phí khác chưa được phân vào đâu,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+209,64202001,Chi phí QLDN - Lương & phúc lợi - CA,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+210,64202002,Chi phí QLDN - Chi phí tư vấn - CA,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+211,64202010,Chi phí QLDN - Payment gateway / transaction fees,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+212,64202011,Chi phí QLDN - Dispute,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+213,64202012,Chi phí QLDN - Chargeback,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+214,64202013,Chi phí QLDN - Partner fees,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+215,64210099,Chi phí QLDN - Khác,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+216,71100001,Thu nhập khác,R,Cr,Active,48:55.8,48:55.8,NULL,NULL
+217,81100001,Chi phí khác,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+218,82111001,Chi phí thuế TNDN hiện hành - VN,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+219,82111002,Chi phí thuế thu nhập hiện hành - CA,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+220,82120001,Chi phí thuế TNDN hoãn lại,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
+221,64202014,Chi phí QLDN - Stripe transaction fee,Exp,Dr,Active,55:37.5,55:37.5,NULL,NULL
+222,64202015,Chi phí QLDN - Stripe standalone fee,Exp,Dr,Active,55:37.5,55:37.5,NULL,NULL

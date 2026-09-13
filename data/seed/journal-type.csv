@@ -1,0 +1,58 @@
+JournalTypeID,DataSource,JournalType,JournalTypeCode,BankAccount,11202052,TransAccount,FeeAccount,Partner,Classify,GroupRule,AddDate,ModifiedDate
+1,PAYPAL,Cancellation of Hold for Dispute Resolution,PP_CANCEL_HOLD_DISPUTE_RESOLUTION,11202051,,NULL,64202010,Fixed = Hold for Dispute,Single,TransactionID,09:22.2,NULL
+2,PAYPAL,Chargeback,PP_CHARGEBACK,11202051,13122001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+3,PAYPAL,Chargeback Fee,PP_CHARGEBACK_FEE,11202051,33102005,64202012,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+4,PAYPAL,Chargeback Reversal,PP_CHARGEBACK_REVERSAL,11202051,13122001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+5,PAYPAL,Direct Credit Card Payment,PP_DIRECT_CREDIT_CARD_PAYMENT,11202051,13122001,NULL,64202010,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+6,PAYPAL,Dispute Fee,PP_DISPUTE_FEE,11202051,33102005,64202011,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+7,PAYPAL,Express Checkout Payment,PP_EXPRESS_CHECKOUT_PAYMENT,11202051,13122001,NULL,64202010,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+8,PAYPAL,Fee Reversal,PP_FEE_REVERSAL,11202051,33102005,64202010,64202010,Fixed = PAYPAL,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+9,PAYPAL,General Account Correction,PP_GENERAL_ACCOUNT_CORRECTION,11202051,33102002,71100001,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+10,PAYPAL,General Bonus,PP_GENERAL_BONUS,11202051,13889001,71100001,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+11,PAYPAL,General Hold,PP_GENERAL_HOLD,11202051,11202052,NULL,64202010,Fixed = General Hold,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+12,PAYPAL,General Hold Release,PP_GENERAL_HOLD_RELEASE,11202051,11202052,NULL,64202010,Fixed = General Hold,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+13,PAYPAL,General Payment,PP_GENERAL_PAYMENT,11202051,13122001,51131001,64202010,From Source,Single,TransactionID,09:22.2,NULL
+14,PAYPAL,Hold on Available Balance,PP_HOLD_AVAILABLE_BALANCE,11202051,11202052,NULL,64202010,Fixed = General Account Hold,Single,TransactionID,09:22.2,NULL
+15,PAYPAL,Hold on Balance for Dispute Investigation,PP_HOLD_DISPUTE_INVESTIGATION,11202051,11202052,NULL,64202010,Fixed = Hold for Dispute,Single,TransactionID,09:22.2,NULL
+16,PAYPAL,Instant Payment Review (IPR) reversal,PP_IPR_REVERSAL,11202051,13122001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+17,PAYPAL,Mass Pay Payment,PP_MASS_PAY_PAYMENT,11202051,33102002,NULL,64202010,From Source,Single,TransactionID,09:22.2,NULL
+18,PAYPAL,Mobile Payment,PP_MOBILE_PAYMENT,11202051,13122001,51131001,64202010,From Source,Single,TransactionID,09:22.2,NULL
+19,PAYPAL,Partner Fee,PP_PARTNER_FEE,11202051,33102005,64202013,64202010,Fixed = PayPal,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+20,PAYPAL,Payment Fee,PP_PAYMENT_FEE,11202051,33102005,64202010,64202010,Fixed = PAYPAL,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+21,PAYPAL,Payment Refund,PP_PAYMENT_REFUND,11202051,13122001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+22,PAYPAL,Payment Reversal,PP_PAYMENT_REVERSAL,11202051,13122001,NULL,64202010,From Source,Single,TransactionID,09:22.2,NULL
+23,PAYPAL,Payment Review Hold,PP_PAYMENT_REVIEW_HOLD,11202051,11202052,NULL,64202010,Fixed = Payment Review Hold,Single,TransactionID,09:22.2,NULL
+24,PAYPAL,Payment Review Release,PP_PAYMENT_REVIEW_RELEASE,11202051,11202052,NULL,64202010,Fixed = Payment Review Hold,Single,TransactionID,09:22.2,NULL
+25,PAYPAL,"PayPal Protection Bonus, Payout for PayPal Buyer Protection, Payout for Full Protection with PayPal Buyer Credit",PP_PROTECTION_BONUS_PAYOUT,11202051,13889001,71100001,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+26,PAYPAL,Reserve Hold,PP_RESERVE_HOLD,11202051,11202052,NULL,64202010,Fixed = Reserve Hold,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+27,PAYPAL,Reserve Release,PP_RESERVE_RELEASE,11202051,11202052,NULL,64202010,Fixed = Reserve Hold,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+28,PAYPAL,Reversal of General Account Hold,PP_REVERSAL_GENERAL_ACCOUNT_HOLD,11202051,11202052,NULL,64202010,Fixed = General Account Hold,Single,TransactionID,09:22.2,NULL
+29,PAYPAL,Tax Hold,PP_TAX_HOLD,11202051,33302001,NULL,64202010,Fixed = Tax,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+30,PAYPAL,Tax Release,PP_TAX_RELEASE,11202051,33302001,NULL,64202010,Fixed = Tax,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",09:22.2,NULL
+31,PAYPAL,User Initiated Currency Conversion,PP_USER_INITIATED_CURRENCY_CONVERSION,11202051,63500001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+32,PAYPAL,User Initiated Withdrawal,PP_USER_INITIATED_WITHDRAWAL,11202051,11301001,NULL,64202010,Fixed = PAYPAL,Single,TransactionID,09:22.2,NULL
+33,ORDERS,Orders Fulfilled Product Revenue,ORD_REV_PRODUCT_FULFILLED,NULL,13122001,51112001,NULL,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,JournalType",09:22.2,NULL
+34,ORDERS,Orders Fulfilled ShipAdd Revenue,ORD_REV_SHIPADD_FULFILLED,NULL,13122001,51131001,NULL,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,JournalType",09:22.2,NULL
+35,ORDERS,Orders Fulfilled Tax Payable,ORD_REV_TAX_FULFILLED,NULL,13122001,33302001,NULL,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,JournalType",09:22.2,NULL
+36,ORDERS,Orders Fulfilled Seller Profit,ORD_SELLER_PROFIT_FULFILLED,NULL,33102001,63202001,NULL,From Source,Bulk,"PostingDate,Currency,CompanyCode,JournalType,Partner",09:22.2,NULL
+53,AccountingSource,BANK_BANK_FEE,BANK_BANK_FEE,11202001,33111002,64200020,64200020,From Source,Single,TransactionID,09:22.2,NULL
+54,AccountingSource,BANK_PAYMENT_OTHER,BANK_PAYMENT_OTHER,11202001,13889001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+55,AccountingSource,BANK_PAYMENT_SALARY,BANK_PAYMENT_SALARY,11202001,33402001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+56,AccountingSource,BANK_PAYMENT_SELLER,BANK_PAYMENT_SELLER,11202001,33102001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+57,AccountingSource,BANK_PAYMENT_SUPPLIER,BANK_PAYMENT_SUPPLIER,11202001,33111002,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+58,AccountingSource,BANK_PAYMENT_COSTSUP,BANK_PAYMENT_COSTSUP,11202001,33102002,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+59,AccountingSource,BANK_RECEIPT_CUSTOMER,BANK_RECEIPT_CUSTOMER,11202001,13111001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+60,AccountingSource,BANK_RECEIPT_OTHER,BANK_RECEIPT_OTHER,11202001,13889001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+61,AccountingSource,BANK_INTERNAL_TRANSFER_TO,BANK_INTERNAL_TRANSFER_TO,11202001,11301001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+62,AccountingSource,BANK_INTERNAL_TRANSFER_FROM,BANK_INTERNAL_TRANSFER_FROM,11202001,11301001,NULL,64200020,From Source,Single,TransactionID,09:22.2,NULL
+63,AccountingSource,SUP_COSTSUP,SUP_COSTSUP,NULL,33102002,63202002,NULL,From Source,Bulk,"PostingDate,Currency,CompanyCode,JournalType,Partner",09:22.2,NULL
+64,AccountingSource,SUP_SUPPLIER_COST_ADJUSTMENT,SUP_SUPPLIER_COST_ADJUSTMENT,NULL,33111002,63202003,NULL,From Source,Bulk,"PostingDate,Currency,CompanyCode,JournalType,Partner",09:22.2,NULL
+65,AccountingSource,SUP_SUPPLIER_COST,SUP_SUPPLIER_COST,NULL,33111002,63202003,NULL,From Source,Bulk,"PostingDate,Currency,CompanyCode,JournalType,Partner",09:22.2,NULL
+66,AccountingSource,SELLER_COST,SELLER_COST,NULL,33102001,63202001,NULL,From Source,Bulk,"PostingDate,Currency,CompanyCode,JournalType,Partner",27:51.4,NULL
+67,AccountingSource,Other Adjustment,OTHER_ADJ,NULL,NULL,NULL,NULL,From Source,Single,TransactionID,02:40.1,NULL
+68,AccountingSource,Revenue Deduction,REVENUE_DEDUCTION,NULL,NULL,NULL,NULL,From Source,Single,TransactionID,02:40.1,NULL
+69,STRIPE,Stripe Charge,STRIPE_CHARGE,11202081,13122001,NULL,64202014,Fixed = Individuals,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",22:10.5,27:20.2
+70,STRIPE,Stripe Refund,STRIPE_REFUND,11202081,13122001,NULL,64202014,Fixed = STRIPE,Single,TransactionID,22:10.5,27:20.2
+71,STRIPE,Stripe Payout,STRIPE_PAYOUT,11202081,11301001,NULL,NULL,Fixed = STRIPE,Single,TransactionID,22:10.5,27:20.2
+72,STRIPE,Stripe Fee,STRIPE_FEE,11202081,33102005,64202015,NULL,Fixed = STRIPE,Bulk,"PostingDate,Currency,CompanyCode,BankAccount,JournalType",22:10.5,27:20.2
+73,STRIPE,Stripe Adjustment,STRIPE_ADJUSTMENT,11202081,13122001,NULL,64202014,Fixed = STRIPE,Single,TransactionID,22:10.5,27:20.2
