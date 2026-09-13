@@ -46,4 +46,4 @@ Web kế toán cho công ty dropshipping: **file order thô → RawOrders → (B
 | UI/antd | §8 |
 | Thêm nguồn PayPal/Stripe/PIPO/AccountingSource | §11.1 |
 | Lỗi thường gặp, câu SQL soi dữ liệu | §12 |
-| Giả định & hạn chế đã biết | §13 |
+| Giả định, hạn chế, **bug đã biết chưa sửa** | §13 (bug: §13.3) |

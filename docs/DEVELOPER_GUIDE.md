@@ -341,7 +341,11 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
 **Parse số – `parseNumber` (`src/lib/engine/parse.ts`):** bỏ ký tự ngoài `0-9 , . -`; `(x)` = âm; có cả `,` và `.` → ký tự xuất hiện sau cùng là dấu thập phân; **chỉ 1 dấu phẩy → coi là thập phân** (`"8,35"`→8.35, `"1,439"`→1.439); nhiều dấu phẩy → phân cách nghìn; nhiều dấu chấm → phân cách nghìn.
 
-**Parse ngày – `parseDate`:** Date (exceljs, đọc bằng UTC getters vì exceljs lưu giờ "tường" dạng UTC), số serial Excel, chuỗi theo thứ tự format `M/D/YYYY`, `M/D/YYYY H:mm:ss`, `M-D-YYYY[ H:mm:ss]`, `YYYY-MM-DD[ HH:mm:ss]`… (**ưu tiên kiểu Mỹ tháng/ngày**). Ô chỉ có giờ trong xlsx (năm 1899) → `HH:mm:ss`.
+**Parse ngày – `parseDate` / `parseDateTime`:**
+- `Date` từ exceljs → đọc bằng UTC getters (exceljs lưu giờ "tường" dạng UTC). Số → serial Excel.
+- Chuỗi → dayjs **strict** với danh sách `DATE_FORMATS` (`parse.ts`): `M/D/YYYY`, `M/D/YYYY H:mm:ss`, `M/D/YYYY H:mm`, `M-D-YYYY`, `M-D-YYYY H:mm:ss`, `M-D-YYYY H:mm`, `YYYY-MM-DD`, `YYYY-MM-DD HH:mm:ss`, `YYYY-MM-DDTHH:mm:ss`, `YYYY/MM/DD`. **Không có format ngày-trước-tháng** → `"20/11/2025"` trả null (với `FulfilledAt` là lỗi dòng; cột ngày khác giữ nguyên text).
+- Không khớp strict nhưng chuỗi có 4 chữ số liền → fallback `dayjs(s)` lỏng (nhận `"Nov 20 2025"`, ISO có `Z`...). ISO có `Z` bị đổi sang **giờ máy chủ** → có thể lệch sang ngày khác.
+- Ô chỉ có giờ trong xlsx (Date năm 1899): cột kiểu `text` (`LastUpdatedTimeAt`, `PaidTimeAt`) qua `toText`/`formatDateTime` → `HH:mm:ss`; nếu rơi vào cột kiểu `date` thì `parseDate` cho `1899-12-30`.
 
 **Test:** `tests/engine/parse.test.ts` (CSV và XLSX mẫu cho kết quả giống nhau), `tests/integration/flow.test.ts`.
 
@@ -368,10 +372,10 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
    Seller (`SellerEmail`, `TaxID`, `StoreName`) lấy từ dòng đầu tiên của group.
 5. Với từng `JournalTypeCode` trong `ORDER_JOURNAL_TYPE_CODES` = [`ORD_REV_PRODUCT_FULFILLED`, `ORD_REV_SHIPADD_FULFILLED`, `ORD_REV_TAX_FULFILLED`, `ORD_SELLER_PROFIT_FULFILLED`]:
-   - Không có JournalType (DataSource `ORDERS`) → `MISSING_JOURNAL_TYPE` (ghi 1 lần/build). Không có rule active → `MISSING_RULE`.
+   - Không có JournalType (DataSource `ORDERS`) → `MISSING_JOURNAL_TYPE`. Không có rule active → `MISSING_RULE`. Hai lỗi cấu hình này và `UNKNOWN_AMOUNT_SOURCE` chỉ ghi **1 lần/build**, với `ComCode`/`Period` = null (nên filter ComCode ở trang Exceptions sẽ ẩn chúng).
    - Mỗi rule active → amount theo `rule.AmountSource` (không nhận ra → `UNKNOWN_AMOUNT_SOURCE`), làm tròn 2.
    - `amount = 0` & `SkipIfAmountZero` → không tạo event, exception `AMOUNT_ZERO` (INFO, SourceKey `{TransactionID}|{JTC}`).
-   - TK Nợ/Có theo rule trỏ vào TK null trên JournalType mà rule có cờ SkipIf...Null → bỏ rule, `MISSING_ACCOUNT` (WARNING).
+   - TK Nợ/Có theo rule trỏ vào TK null trên JournalType mà rule có cờ SkipIf...Null → bỏ rule, `MISSING_ACCOUNT` (WARNING). **Không có cờ Skip** → event vẫn được tạo và sẽ lỗi `MISSING_ACCOUNT` (ERROR) khi Post.
    - Partner theo `JournalType.Partner`: `Fixed = X` → `resolveFixedPartner`; `From Source` → `resolveSeller` (§6.2.1). Seller lỗi → event vẫn tạo với `PostStatus=ERROR`, `ErrorStage=BUILD`, `PartnerCode = SellerEmail`, exception `MISSING_PARTNER`.
    - Sinh `EventDraft`:
 
@@ -417,10 +421,11 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
    - Draft chưa có → insert (`EventsCreated`).
    - Đã có & `POSTED` → giữ nguyên (`EventsUnchangedPosted`); nếu `SourceHash` khác → exception `POSTED_SOURCE_CHANGED` (WARNING).
    - Đã có & chưa POSTED → update toàn bộ, xóa thông tin post (`EventsReplaced`; **build lại luôn replace kể cả không đổi**).
-   - Event cũ của các SourceID đó mà lần này không sinh ra và chưa POSTED → **xóa** (`EventsRemoved`).
+   - Event cũ của các SourceID đó mà lần này không sinh ra và chưa POSTED → **xóa** (`EventsRemoved`). Lưu ý: event cũ được load theo `SourceID` **không lọc ComCode** → xem §13.3.
+   - Event POSTED mà lần này amount về 0 (bị skip) → không có draft nên **không** sinh `POSTED_SOURCE_CHANGED`, chỉ có `AMOUNT_ZERO`.
    - Cập nhật `RawOrders.BuildStatus/BuildMessage/ComCode` cho mọi dòng đã xử lý.
    - Xóa exception BUILD cũ theo tập SourceKey có thể sinh ra (ItemCode, `{TransactionID}|{JTC}`, các JTC, `{JTC}|{RuleSeq}`), rồi insert exception mới.
-5. BuildBatch → SUCCESS (hoặc FAILED + ErrorMessage; transaction rollback).
+5. BuildBatch → SUCCESS (hoặc FAILED + ErrorMessage; transaction rollback – khi FAILED, các bộ đếm `EventsCreated/Replaced` trong response có thể khác 0 dù dữ liệu đã rollback).
 
 **Test:** `tests/engine/build-orders.test.ts`.
 
@@ -445,12 +450,12 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 2. `dr = accountFromSource(rule.NormalDrAccountSource, event)`, `cr` tương tự (**dùng cột TK trên event**, tức giá trị copy lúc build). Null → bỏ qua nếu có cờ `SkipIfDr/CrAccountNull`, ngược lại lỗi `MISSING_ACCOUNT`.
 3. TK không có trong CoA → lỗi `ACCOUNT_NOT_IN_COA`.
 4. `amount = Event.Amount × rule.AmountFactor` (round 2). `0` & `SkipIfAmountZero` → bỏ qua `AMOUNT_ZERO`.
-5. `NegativeMode = rule.NegativeMode ?? (ReverseIfNegative ? "REVERSE" : "SIGNED")`. Amount âm:
+5. `NegativeMode = rule.NegativeMode ?? (ReverseIfNegative ? "REVERSE" : "SIGNED")` (giá trị lạ ngoài REVERSE/ERROR được xử lý như SIGNED). Amount âm:
    - `SIGNED`: giữ dấu âm ở cả 2 vế.
    - `REVERSE`: đổi chỗ TK Nợ/Có, lấy trị tuyệt đối.
    - `ERROR`: lỗi `NEGATIVE_AMOUNT`.
 6. Partner dòng: `PartnerMode = FIXED` & có `FixedPartner` → `resolveFixedPartner(UPPER(FixedPartner))`; ngược lại partner header của event. Gắn vào dòng Nợ/Có nếu `ApplyPartnerToDrLine/CrLine = 1`, không thì null.
-7. `resolveFx(exrates, {period, fncCurr, inputCurr})` (`src/lib/engine/resolve-fx.ts`): cùng tiền → `XRate=1, MUL`; khác → Exrate `IsActive`, `Period` = kỳ event, `ReportCurrency` = FncCurr, `TransCurrency` = InputCurr, `Exrate > 0`, lấy `ExrateDate` mới nhất; không có → lỗi `MISSING_FX`. `applyFx`: MUL = ×, DIV = ÷, round 2.
+7. `resolveFx(exrates, {period, fncCurr, inputCurr})` (`src/lib/engine/resolve-fx.ts`): cùng tiền → `XRate=1, MUL`; khác → Exrate `IsActive`, `Period` = kỳ event, `ReportCurrency` = FncCurr, `TransCurrency` = InputCurr, `Exrate > 0`, lấy `ExrateDate` mới nhất; không có → lỗi `MISSING_FX`. `RateType` = `DIV` thì chia, **mọi giá trị khác coi là MUL**. `applyFx` round 2.
 8. `memo = rule.MemoTemplate ?? event.Description ?? JTC`.
 
 **Single** – mỗi event 1 chứng từ:
@@ -463,6 +468,7 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 - Trong group, cộng dòng theo khóa `PairCode|BalanceImpact|AccountCode|PartnerCode|PartnerTaxID|XRate|RateType` (Input cộng Input; Accounted cộng các Accounted đã round từng event).
 - `DocNum = ASB-{yyyyMMdd}-{AccountingEventID nhỏ nhất trong group}` (`bulkDocNum`).
 - Header dòng lấy từ event đầu tiên của group; `ReferenceTxnID/OrderID/RefNum = null`; `Description = {memo} | {số event} events`.
+- Chỉ gom **các candidate của lần post hiện tại**: event được post bổ sung sau (VD retry lỗi) sẽ ra chứng từ `ASB-…` **mới** dù trùng `PostingGroupKey` với chứng từ đã có.
 
 **Chung:** dòng Nợ có `InputCr = AccountedCr = 0`, `BalanceImpact = Debit`; dòng Có ngược lại. `IsReversal/ReverseID/IsReval/Segment = null`. `assertBalanced` kiểm tra Σ AccountedDr = Σ AccountedCr theo từng DocNum, sai thì throw.
 
@@ -470,7 +476,7 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
 ### 6.4 Unpost / Unbuild / Unpost + Unbuild / Reset
 
-`src/lib/services/clear.ts`. Mọi hàm nhận `preview` → chỉ đếm, không sửa.
+`src/lib/services/clear.ts`. `unpost` và `unbuild` nhận `preview` → chỉ đếm, không sửa. `resetTransactionalData` không có preview (xóa ngay).
 
 **`unpost({scope, postBatchId, preview})`** – `POST /api/unpost`
 1. Tìm event `POSTED` trong scope (và `PostBatchID` nếu có) → tập `PostedDocNum`.
@@ -481,8 +487,8 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 **`unbuild({scope, includePosted, preview})`** – `POST /api/unbuild`
 1. `includePosted = true` → chạy `unpost(scope)` trước (preview thì chỉ mô phỏng).
 2. Xóa event trong scope có `PostStatus ≠ POSTED` (`deletedEvents`); `postedEventsKept` = số event POSTED còn lại.
-3. Raw về `NOT_BUILT` (BuildMessage null) nếu: `BuildStatus ≠ NOT_BUILT`, `ComCode` = scope **hoặc null**, kỳ `FulfilledAt` trong scope, và `OrderId` **không** còn event POSTED nào.
-4. Xóa `ExceptionLog` BatchType BUILD khớp ComCode/Period của scope (không scope → xóa hết BUILD).
+3. Raw về `NOT_BUILT` (BuildMessage null) nếu: `BuildStatus ≠ NOT_BUILT`, `RawOrders.ComCode` (giá trị đã lưu, không phải mapping hiện tại) = scope **hoặc null**, kỳ `FulfilledAt` trong scope, và `OrderId` **không** còn event POSTED nào.
+4. Xóa `ExceptionLog` BatchType BUILD khớp `ComCode = scope` / `Period` trong scope (không scope → xóa hết BUILD). Có scope thì exception có ComCode/Period null (VD `MISSING_COMCODE`, lỗi cấu hình) **không bị xóa**; exception POST của event bị xóa **không bị dọn** (mồ côi).
 
 **`resetTransactionalData()`** – `POST /api/reset`: xóa `GLTrans, AccountingEvent, PostingBatch, BuildBatch, ExceptionLog, RawOrders, ImportBatch` + reset `sqlite_sequence` (ID bắt đầu lại từ 1). Master giữ nguyên.
 
@@ -507,28 +513,29 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
 ### 6.8 Exceptions
 
-- **UI:** `/exceptions` – bảng tổng hợp (click để lọc), filter Bước/Mức/Type/ComCode/search, bảng chi tiết. Mô tả cách xử lý nằm trong hằng `TYPE_DOCS` của `src/app/exceptions/page.tsx`.
-- **API:** `GET /api/exceptions` → `{rows, total, byType}`.
+- **UI:** `/exceptions` – bảng tổng hợp (click để lọc), filter Bước/Mức/Type/ComCode/search, bảng chi tiết. Mô tả cách xử lý nằm trong hằng `TYPE_DOCS` của `src/app/exceptions/page.tsx` (**đang thiếu `UNKNOWN_AMOUNT_SOURCE`**).
+- **API:** `GET /api/exceptions` → `{rows, total, byType}`; `byType` luôn tổng hợp **toàn bảng**, không theo filter.
 - **Kiểu:** `ExceptionType` trong `src/lib/engine/types.ts`.
+- SourceKey của **mọi exception bước POST** có dạng `EventID {AccountingEventID} | {TransactionID}` (ghi tắt "EventID" trong bảng dưới).
 
 | ExceptionType | Bước | Severity | SourceKey | Ý nghĩa / xử lý |
 |---|---|---|---|---|
 | `NOT_FULFILLED` | BUILD | INFO | ItemCode | Chưa fulfill → bình thường |
 | `MISSING_COMCODE` | BUILD | ERROR | ItemCode | Gateway chưa map → thêm GatewayCompanyMapping, build lại |
 | `MISSING_COMPANY` | BUILD | ERROR | ItemCode | ComCode chưa có trong Company |
-| `MISSING_JOURNAL_TYPE` | BUILD | ERROR | JTC | Thiếu JournalType ORDERS |
-| `MISSING_RULE` | BUILD / POST | ERROR | JTC / `EventID {id} \| {TxnID}` | Thiếu JournalLineRule active |
-| `UNKNOWN_AMOUNT_SOURCE` | BUILD | ERROR | `{JTC}\|{RuleSeq}` | AmountSource không áp dụng cho Orders |
+| `MISSING_JOURNAL_TYPE` | BUILD | ERROR | JTC | Thiếu JournalType ORDERS (1 lần/build, ComCode null) |
+| `MISSING_RULE` | BUILD / POST | ERROR | JTC / EventID | Thiếu JournalLineRule active |
+| `UNKNOWN_AMOUNT_SOURCE` | BUILD | ERROR | `{JTC}\|{RuleSeq}` | AmountSource không áp dụng cho Orders (1 lần/build) |
 | `AMOUNT_ZERO` | BUILD / POST | INFO | `{TxnID}\|{JTC}` / EventID | Số tiền 0 → bỏ qua, bình thường |
 | `MISSING_PARTNER` | BUILD | ERROR | `{TxnID}\|{JTC}` | Seller không map được (§6.2.1) |
-| `MISSING_ACCOUNT` | BUILD (WARNING) / POST (INFO nếu skip, ERROR nếu không) | | | Rule trỏ tới TK null |
+| `MISSING_ACCOUNT` | BUILD (WARNING, bỏ rule) / POST (INFO nếu có cờ Skip, ngược lại ERROR) | | `{TxnID}\|{JTC}` / EventID | Rule trỏ tới TK null |
 | `ACCOUNT_NOT_IN_COA` | POST | ERROR | EventID | TK không có trong CoA |
 | `NEGATIVE_AMOUNT` | POST | ERROR | EventID | Âm với NegativeMode ERROR |
 | `MISSING_FX` | POST | ERROR | EventID | Thiếu tỷ giá kỳ/đồng tiền |
 | `POSTED_SOURCE_CHANGED` | BUILD | WARNING | `{TxnID}\|{JTC}` | Event đã post nhưng nguồn/cấu hình đổi → Unpost, Build, Post lại |
 | `INVALID_FULFILLED_DATE` | — | — | — | **Khai báo nhưng chưa dùng** (import đang từ chối dòng thay vì ghi exception) |
 
-- Exception là "trạng thái hiện tại": mỗi lần Build/Post xóa exception cũ có cùng SourceKey rồi ghi lại → chạy lại nhiều lần không bị nhân đôi.
+- Chống nhân đôi: Build xóa exception BUILD cũ theo tập SourceKey mà lần build đó có thể sinh ra; Post xóa exception POST cũ của **các candidate lần post đó**. Exception của event đã bị xóa (rebuild bỏ event stale, Unbuild) có thể còn sót lại.
 - Với dữ liệu mẫu, build sinh 70 exception INFO (4 NOT_FULFILLED + 66 AMOUNT_ZERO).
 
 ### 6.9 Master data page
@@ -551,8 +558,10 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 ## 7. API reference
 
 Tất cả handler bọc bởi `handle()` (`src/lib/api.ts`): `BadRequestError` → 400 `{error}`; lỗi khác → log + 500 `{error}`.
-Scope (`parseScope`): `comCode` (tự uppercase), `periodFrom`, `periodTo` (**bắt buộc dạng YYYYMM**, sai → 400), `dataSource`.
-Phân trang (`paging`): `page` (mặc định 1), `pageSize` (mặc định 50; service giới hạn tối đa 5000).
+- **Scope (`parseScope`)** – dùng ở build, post, unpost, unbuild, cycle, events (+export), gl (+summary, export): `comCode` (tự uppercase), `periodFrom`, `periodTo` (**bắt buộc YYYYMM**, sai → 400), `dataSource`.
+- `/api/orders` và `/api/exceptions` đọc `comCode/periodFrom/periodTo` bằng `str()` → **không validate, không uppercase** (so khớp chính xác).
+- **Phân trang (`paging`)**: `page` (mặc định 1), `pageSize` (mặc định 50; service giới hạn tối đa 5000).
+- **Body lỏng:** `jsonBody` biến JSON hỏng thành `{}`; `bool()` chỉ nhận `"1"`/`"true"`/`true`; `int()` giá trị không phải số → null. Hệ quả: body sai gửi tới `/api/unpost` hoặc `/api/unbuild` sẽ chạy thật **trên toàn bộ dữ liệu** (không preview, không lọc batch) – UI luôn gửi đúng nhưng cần cẩn thận khi gọi tay.
 
 | Method | Path | Tham số | Response | Service |
 |---|---|---|---|---|
@@ -578,7 +587,7 @@ Phân trang (`paging`): `page` (mặc định 1), `pageSize` (mặc định 50; 
 | GET | `/api/exceptions` | page, pageSize, batchType, exceptionType, severity, comCode, search | `{rows, total, byType}` | `listExceptions` |
 | GET | `/api/dashboard` | – | stats | `dashboardStats` |
 | GET | `/api/options` | – | `FilterOptions` | `filterOptions` |
-| GET | `/api/master/[table]` | table ∈ `gatewayCompanyMapping, partners, journalType, journalLineRule, coa, exrate, mappingBankAccount`; search, page, pageSize | `{rows, total}` | `listMaster` |
+| GET | `/api/master/[table]` | table ∈ `gatewayCompanyMapping, partners, journalType, journalLineRule, coa, exrate, mappingBankAccount` (khác → 404); search; page/pageSize **chỉ áp dụng cho partners**, bảng khác trả toàn bộ | `{rows, total}` | `listMaster` |
 | GET | `/api/master/company` | – | `{rows, total}` | `listMaster("company")` |
 | POST | `/api/master/company` | `{ComCode, CompanyName?, FunctionalCurrency, IsActive?}` | `{done}` | `upsertCompany` |
 | POST | `/api/master/gateway-mapping` | `{ID?, PaymentGatewayName, ComCode, IsActive?}` | `{done}` / 400 | `upsertGatewayMapping` |
@@ -600,7 +609,7 @@ Dynamic params trong Next 16 là Promise: `(req, ctx: { params: Promise<{ id: st
 
 ### 8.2 Helper
 `src/components/client.ts`:
-- `useApi<T>(url | null)` → `{data, loading, error, reload}`; `url = null` thì không gọi; tự gọi lại khi url đổi; chống race bằng sequence ref. Filter/phân trang thường được đưa vào url qua `toQuery`.
+- `useApi<T>(url | null)` → `{data, loading, error, reload}`; `url = null` thì không gọi; tự gọi lại khi url đổi; chống race bằng sequence ref. Filter/phân trang thường được đưa vào url qua `toQuery`. `data` cũ **được giữ** tới khi request mới xong (kể cả khi url thành null) → Drawer có thể thoáng hiện dữ liệu bản ghi trước.
 - `getJson`, `postJson(url, body, method?)`, `deleteJson` – lỗi HTTP ném `Error(body.error)`.
 - `toQuery(obj)` bỏ giá trị null/undefined/"".
 - `useOptions()` = `useApi("/api/options")`; `money(v)` định dạng `en-US` 2 số lẻ.
@@ -729,6 +738,7 @@ Sửa `amountFor()` và phần cộng dồn group trong `build-orders.ts` (thêm
 |---|---|---|
 | `npm run db:reset` báo `EPERM` (Windows) | Dev server/process node vẫn giữ file DB | Tắt `next dev` (kiểm tra còn process `node ... next dev` không) rồi chạy lại |
 | `no such table` / `no such column` | Sửa schema nhưng chưa sinh migration | `npm run db:generate` rồi restart; dữ liệu test thì `db:reset` |
+| Upload .xlsx trả 500 `Cannot read properties of undefined (reading 'trim')` | Dòng tiêu đề có ô trống **nằm giữa** các cột → `headers` có phần tử rỗng (sparse) | Xóa cột trống trong file; fix code: §13.3 |
 | Import số sai (VD `"1,234"` thành 1.234) | Một dấu phẩy được hiểu là thập phân (file xuất từ Google Sheet locale VN) | File dùng dấu phẩy phân cách nghìn kiểu Mỹ phải có phần thập phân (`1,234.00`) hoặc xuất .xlsx; hoặc sửa `parseNumber` |
 | Ngày bị đảo ngày/tháng | `parseDate` ưu tiên `M/D/YYYY` | Dùng `YYYY-MM-DD` hoặc .xlsx |
 | Import lỗi "Unbuild trước khi import lại" | Dòng đã BUILT và dữ liệu thay đổi | Unbuild (hoặc Unpost + Unbuild) phạm vi đó rồi import lại |
@@ -780,7 +790,7 @@ Test nhanh 1 hàm engine mà không chạy app: viết test trong `tests/engine/
 
 ## 13. Giả định, hạn chế, nợ kỹ thuật
 
-**Giả định nghiệp vụ (chưa được xác nhận chính thức)**
+### 13.1 Giả định nghiệp vụ (chưa được xác nhận chính thức)
 - Dòng GL Bulk: `ReferenceTxnID/OrderID/RefNum = null`, `Description = MemoTemplate | {n} events` (sheet mẫu chỉ có dòng Single).
 - Order không có cột tiền tệ → `InputCurr = USD`.
 - `PartnerTaxID` trên GL lấy từ bảng Partners (với INDIVIDUALS là `INDIVIDUALS`), trong khi sample GL PayPal cũ để null với partner cố định.
@@ -788,7 +798,7 @@ Test nhanh 1 hàm engine mà không chạy app: viết test trong `tests/engine/
 - Company = cổng thanh toán; `ZeniroxPay Inc.` và `ZeniroxPay - Stripe` cùng `ZENIROXPAY`.
 - `ProductAmount = Quantity × UnitPrice` theo tài liệu, không dùng `TotalPrice` (có dòng mẫu `TotalPrice` lệch).
 
-**Hạn chế kỹ thuật**
+### 13.2 Hạn chế kỹ thuật
 - Tài khoản trên event là bản copy lúc Build; rule/tỷ giá/CoA đọc lúc Post.
 - `hasAccount` trả true nếu CoA rỗng.
 - `loadMasterIndex` đọc toàn bộ master mỗi lần gọi (không cache).
@@ -799,6 +809,26 @@ Test nhanh 1 hàm engine mà không chạy app: viết test trong `tests/engine/
 - SQLite 1 process; không phù hợp nhiều instance.
 - `INVALID_FULFILLED_DATE` chưa dùng.
 - Chưa có test trình duyệt trong repo.
+
+### 13.3 Bug / rủi ro đã biết (chưa sửa)
+
+Phát hiện khi rà soát tài liệu với code. Khi sửa, thêm test tái hiện và xóa dòng tương ứng ở đây.
+
+| # | Vấn đề | Vị trí | Hướng sửa gợi ý |
+|---|---|---|---|
+| 1 | File .xlsx có ô tiêu đề trống giữa các cột → `canonicalHeaders` gọi `.trim()` trên phần tử undefined → HTTP 500 (đã tái hiện) | `src/lib/io/read-table.ts` (`headerOf` dùng `.map` trên mảng thưa), `src/lib/orders/normalize.ts` (`canonicalHeaders`) | Dùng `Array.from(values, ...)` hoặc `h ?? ""` trước khi trim |
+| 2 | Body JSON hỏng / `postBatchId` không phải số → `/api/unpost`, `/api/unbuild` chạy thật trên toàn bộ dữ liệu | `src/lib/api.ts` (`jsonBody`, `int`, `bool`) | Ném `BadRequestError` khi JSON hỏng hoặc tham số sai kiểu |
+| 3 | Build theo 1 ComCode có thể xóa event chưa post của ComCode khác cùng `OrderId + ngày` (hoặc event ComCode cũ sau khi đổi gateway mapping) | `src/lib/services/build.ts` (load `existing` theo `SourceID`) | Thêm điều kiện ComCode khi load/xóa stale, hoặc xử lý đổi mapping có chủ đích |
+| 4 | Event POSTED mà amount nguồn về 0 không báo `POSTED_SOURCE_CHANGED` | `src/lib/services/build.ts` | So sánh cả event POSTED không còn draft |
+| 5 | Bulk post bổ sung sinh chứng từ mới trùng `PostingGroupKey` | `src/lib/engine/post.ts` | Chấp nhận (mỗi batch 1 chứng từ) hoặc gom vào chứng từ cũ |
+| 6 | `hasAccount` không xét `CoA.Status` (TK inactive vẫn qua) | `src/lib/engine/masters.ts` | Chỉ nạp TK `Status = Active` |
+| 7 | `NegativeMode` lạ → SIGNED; `RateType` khác `DIV` → MUL, không báo lỗi | `src/lib/engine/post.ts`, `src/lib/engine/resolve-fx.ts` | Validate khi parse master |
+| 8 | Unbuild lọc raw theo `RawOrders.ComCode` đã lưu, Build lọc theo mapping hiện tại → lệch khi mapping đổi | `src/lib/services/clear.ts`, `src/lib/services/build.ts` | Thống nhất 1 cách xác định ComCode |
+| 9 | Exception POST mồ côi sau rebuild/Unbuild; Unbuild có scope không xóa exception ComCode/Period null | `src/lib/services/build.ts`, `src/lib/services/clear.ts` | Xóa exception theo event bị xóa |
+| 10 | `parseDate` fallback lỏng đổi ISO có `Z` sang giờ máy chủ (có thể lệch ngày); không hỗ trợ `DD/MM/YYYY` | `src/lib/engine/parse.ts` | Parse UTC cho chuỗi có timezone; thêm tùy chọn định dạng khi import |
+| 11 | `/api/orders`, `/api/exceptions` không validate/uppercase `comCode`, kỳ | route tương ứng | Dùng `parseScope` |
+| 12 | `TYPE_DOCS` thiếu `UNKNOWN_AMOUNT_SOURCE` | `src/app/exceptions/page.tsx` | Bổ sung mô tả |
+| 13 | Response Build FAILED có thể báo số event tạo/thay khác 0 dù đã rollback | `src/lib/services/build.ts` | Reset bộ đếm khi lỗi |
 
 ---
 
