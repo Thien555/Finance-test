@@ -81,6 +81,8 @@ Auth/phân quyền (§20), Company tree & Accounting Period lock (§4), nguồn 
 | `npm run db:seed` | Nạp lại 6 bảng master từ `data/seed/*.csv` |
 | `npm run db:reset` | Xóa `data/finance.db*` (phải tắt dev server trước trên Windows) |
 
+**Cài dependency:** `npm ci` (hoặc `npm i`), Node ≥ 22. Không cần Python hay Visual C++ Build Tools. File `.npmrc` đặt `ignore-scripts=true` vì npm bỏ qua `"gypfile": false` của `better-sqlite3` 13 (lấy metadata từ lockfile) nên vẫn gọi `node-gyp rebuild`. Lệnh này lỗi trên máy không có toolchain, dù gói đã kèm sẵn binary `prebuilds/<platform>-<arch>.node`. Các install script khác trong cây phụ thuộc (esbuild, unrs-resolver, fsevents) chỉ để kiểm tra hoặc dự phòng, bỏ qua không ảnh hưởng. Nếu sau này thêm gói **thật sự cần** postinstall: `npm rebuild <gói> --ignore-scripts=false`. Script gốc (`npm run dev`, `npm test`...) vẫn chạy bình thường, chỉ hook `pre*`/`post*` bị bỏ qua.
+
 ---
 
 ## 2. Kiến trúc & thư mục
@@ -736,6 +738,7 @@ Sửa `amountFor()` và phần cộng dồn group trong `build-orders.ts` (thêm
 
 | Triệu chứng | Nguyên nhân | Xử lý |
 |---|---|---|
+| `npm i` lỗi `better-sqlite3` … `gyp ERR! find Python` | Mất `.npmrc` (`ignore-scripts=true`) hoặc gọi npm với `--ignore-scripts=false` → npm chạy `node-gyp rebuild` (§1.4) | Giữ `.npmrc`, xóa `node_modules` rồi `npm ci`; không cần cài Python/Build Tools |
 | `npm run db:reset` báo `EPERM` (Windows) | Dev server/process node vẫn giữ file DB | Tắt `next dev` (kiểm tra còn process `node ... next dev` không) rồi chạy lại |
 | `no such table` / `no such column` | Sửa schema nhưng chưa sinh migration | `npm run db:generate` rồi restart; dữ liệu test thì `db:reset` |
 | Upload .xlsx trả 500 `Cannot read properties of undefined (reading 'trim')` | Dòng tiêu đề có ô trống **nằm giữa** các cột → `headers` có phần tử rỗng (sparse) | Xóa cột trống trong file; fix code: §13.3 |
