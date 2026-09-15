@@ -31,7 +31,7 @@ export default function EventsPage() {
   const { data: options } = useOptions();
   const [scope, setScope] = useState<ScopeValue>({});
   const [filter, setFilter] = useState<{ journalTypeCode?: string; postStatus?: string; search?: string }>({});
-  const [page, setPage] = useState({ page: 1, pageSize: 50 });
+  const [page, setPage] = useState({ page: 1, pageSize: 10 });
   const [busy, setBusy] = useState<string | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
 
