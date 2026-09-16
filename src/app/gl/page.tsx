@@ -58,7 +58,7 @@ function GlContent() {
     const id = Number(params.get("postBatchId"));
     return id ? { postBatchId: id } : {};
   });
-  const [page, setPage] = useState({ page: 1, pageSize: 100 });
+  const [page, setPage] = useState({ page: 1, pageSize: 10 });
   const [docNum, setDocNum] = useState<string | null>(null);
 
   const query = toQuery({ ...scope, ...filter });
@@ -202,7 +202,7 @@ function GlContent() {
                     pageSize: page.pageSize,
                     total: list.data?.total,
                     showSizeChanger: true,
-                    pageSizeOptions: [100, 500, 1000],
+                    pageSizeOptions: [10,100, 500, 1000],
                     showTotal: (n) => `${n} dòng`,
                     onChange: (p, s) => setPage({ page: p, pageSize: s }),
                   }}
