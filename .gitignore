@@ -42,3 +42,8 @@ next-env.d.ts
 
 # sqlite database (tạo lại bằng npm run dev / npm run db:reset)
 /data/finance.db*
+
+# dữ liệu order thật của công ty + kết quả kiểm tra (chứa email seller, số tiền thật) — KHÔNG commit
+/docs/full-order.xlsx
+/docs/audit/
+/data/audit/
