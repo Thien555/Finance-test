@@ -17,3 +17,48 @@ ExrateID,Period,ExrateDate,ReportCurrency,TransCurrency,RateType,Exrate,SourceNo
 16,202503,3/31/2025,USD,USD,MUL,1,Monthly rate,1,27:01.1,NULL
 17,202503,3/31/2025,USD,VND,DIV,26500,Monthly rate,1,27:01.1,NULL
 18,202503,3/31/2025,USD,CNY,DIV,"7,25",Monthly rate,1,27:01.1,NULL
+19,202501,1/1/2025,CAD,USD,MUL,"1,439",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+20,202501,1/1/2025,VND,USD,MUL,"25321,41",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+21,202502,2/1/2025,CAD,USD,MUL,"1,4301",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+22,202502,2/1/2025,VND,USD,MUL,25437,Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+23,202503,3/1/2025,CAD,USD,MUL,"1,4359",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+24,202503,3/1/2025,VND,USD,MUL,"25544,76",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+25,202504,4/1/2025,CAD,USD,MUL,"1,3988",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+26,202504,4/1/2025,VND,USD,MUL,"25878,43",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+27,202505,5/1/2025,CAD,USD,MUL,"1,386",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+28,202505,5/1/2025,VND,USD,MUL,25957,Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+29,202506,6/1/2025,CAD,USD,MUL,"1,3674",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+30,202506,6/1/2025,VND,USD,MUL,"26073,67",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+31,202507,7/1/2025,CAD,USD,MUL,"1,3691",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+32,202507,7/1/2025,VND,USD,MUL,"26151,87",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+33,202508,8/1/2025,CAD,USD,MUL,"1,3802",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+34,202508,8/1/2025,VND,USD,MUL,"26283,57",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+35,202509,9/1/2025,CAD,USD,MUL,"1,3833",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+36,202509,9/1/2025,VND,USD,MUL,"26336,45",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+37,202510,10/1/2025,CAD,USD,MUL,"1,3992",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+38,202510,10/1/2025,VND,USD,MUL,"26263,22",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+39,202511,11/1/2025,CAD,USD,MUL,"1,4055",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+40,202511,11/1/2025,VND,USD,MUL,"26264,05",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+41,202512,12/1/2025,CAD,USD,MUL,"1,3802",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+42,202512,12/1/2025,VND,USD,MUL,"26266,39",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+43,202601,1/1/2026,CAD,USD,MUL,"1,3778",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+44,202601,1/1/2026,VND,USD,MUL,"26189,3",Monthly avg mid Vietcombank - adjusted into daily +/-1% band (TT99),1,NULL,NULL
+45,202602,2/1/2026,CAD,USD,MUL,"1,3651",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+46,202602,2/1/2026,VND,USD,MUL,"26005,6",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+47,202603,3/1/2026,CAD,USD,MUL,"1,3717",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+48,202603,3/1/2026,VND,USD,MUL,"26201,5",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+49,202604,4/1/2026,CAD,USD,MUL,"1,3751",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+50,202604,4/1/2026,USD,CAD,DIV,"1,3751",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+51,202604,4/1/2026,VND,USD,MUL,"26247,6",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+52,202605,5/1/2026,CAD,USD,MUL,"1,3723",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+53,202605,5/1/2026,USD,CAD,DIV,"1,3723",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+54,202605,5/1/2026,VND,USD,MUL,"26260,55",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+55,202606,6/1/2026,CAD,USD,MUL,"1,404",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+56,202606,6/1/2026,USD,CAD,DIV,"1,404",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+57,202606,6/1/2026,VND,USD,MUL,"26273,18",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+58,202607,7/1/2026,CAD,USD,MUL,"1,4107",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+59,202607,7/1/2026,USD,CAD,DIV,"1,4107",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+60,202607,7/1/2026,VND,USD,MUL,"26294,57",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
+61,202608,8/1/2026,CAD,USD,MUL,"1,3898",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+62,202608,8/1/2026,USD,CAD,DIV,"1,3898",Monthly avg - Bank of Canada FXMUSDCAD,1,NULL,NULL
+63,202608,8/1/2026,VND,USD,MUL,"26157,62",Monthly avg mid (buy transfer + sell)/2 - Vietcombank,1,NULL,NULL
