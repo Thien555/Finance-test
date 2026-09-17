@@ -16,7 +16,9 @@ export type ExceptionType =
   | "AMOUNT_ZERO"
   | "NEGATIVE_AMOUNT"
   | "MISSING_FX"
-  | "POSTED_SOURCE_CHANGED";
+  | "POSTED_SOURCE_CHANGED"
+  | "POSTED_KEY_CHANGED"
+  | "DUPLICATE_ITEM";
 
 export interface ExceptionDraft {
   DataSource: string;

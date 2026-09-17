@@ -85,6 +85,32 @@ export interface BuildOrdersResult {
 
 const d = (v: number | null | undefined) => new Decimal(v ?? 0);
 
+/** Dòng đủ điều kiện ghi nhận doanh thu: ItemStatus = FULFILLED và có FulfilledAt */
+function isFulfilled<T extends Pick<OrderSourceRow, "ItemStatus" | "FulfilledAt">>(row: T): row is T & { FulfilledAt: string } {
+  return (row.ItemStatus ?? "").trim().toUpperCase() === "FULFILLED" && !!row.FulfilledAt;
+}
+
+/**
+ * Dòng raw cần build khi chọn phạm vi ComCode: build TRỌN đơn (OrderId + ngày giao = SourceID), không build lẻ dòng.
+ *  - Mọi dòng đang map vào ComCode đó (theo GatewayCompanyMapping hiện tại);
+ *  - Cộng mọi dòng khác của SourceID có dòng map vào ComCode đó, hoặc đang có event của ComCode đó (`scopeEventSourceIds`
+ *    – mapping đã đổi đi nơi khác).
+ * Nhờ vậy đơn đi qua nhiều cổng/công ty luôn được đối chiếu đủ event của mọi ComCode, không bỏ sót event cũ.
+ * Không chọn ComCode → toàn bộ dòng.
+ */
+export function orderRowsInScope<R extends Pick<OrderSourceRow, "OrderId" | "FulfilledAt" | "PaymentGatewayName">>(
+  periodRows: R[],
+  index: MasterIndex,
+  scopeComCode: string | null,
+  scopeEventSourceIds: Iterable<string> = [],
+): R[] {
+  if (!scopeComCode) return periodRows;
+  const inScope = (r: R) => index.comCodeOfGateway(r.PaymentGatewayName) === scopeComCode;
+  const sourceIds = new Set(scopeEventSourceIds);
+  for (const r of periodRows) if (r.FulfilledAt && inScope(r)) sourceIds.add(orderSourceId(r.OrderId, r.FulfilledAt));
+  return periodRows.filter((r) => inScope(r) || (!!r.FulfilledAt && sourceIds.has(orderSourceId(r.OrderId, r.FulfilledAt))));
+}
+
 /** AmountSource trong JournalLineRule → số tiền của group */
 function amountFor(source: string | null, g: OrderGroup): Decimal | null {
   switch ((source ?? "").trim().toUpperCase()) {
@@ -114,8 +140,7 @@ export function buildOrderEvents(rows: OrderSourceRow[], index: MasterIndex): Bu
   // ── Bước 1-4: lọc, resolve ComCode, group ──
   for (const row of rows) {
     const comCode = index.comCodeOfGateway(row.PaymentGatewayName);
-    const status = (row.ItemStatus ?? "").trim().toUpperCase();
-    if (status !== "FULFILLED" || !row.FulfilledAt) {
+    if (!isFulfilled(row)) {
       skippedRows++;
       const message = `ItemStatus=${row.ItemStatus ?? ""}${row.FulfilledAt ? "" : ", FulfilledAt trống"} → không ghi nhận doanh thu`;
       rawStatus.set(row.RawOrderID, { status: "SKIPPED", message, comCode: comCode ?? null });
@@ -309,6 +334,7 @@ export function buildOrderEvents(rows: OrderSourceRow[], index: MasterIndex): Bu
             partner,
             items: [...g.itemCodes].sort(),
           }),
+          ItemCodes: JSON.stringify([...g.itemCodes].sort()),
           rawOrderIds: g.rawOrderIds,
         });
       }

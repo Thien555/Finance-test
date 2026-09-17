@@ -2,13 +2,16 @@
  * (3) POST: AccountingEvent → GLTrans (+ PostingBatch, ExceptionLog)
  *  - Lấy event PostStatus = NEW (hoặc ERROR do lần post trước lỗi) trong scope
  *  - Chia Single/Bulk theo JournalType.Classify
+ *  - Chốt chặn ghi sổ trùng theo item (engine findDuplicateItems): event trùng item với event khác ngày giao/công ty → ERROR, không post
  *  - Mỗi lần post 1 loại = 1 PostingBatch
  */
 import { and, eq, inArray, or } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { accountingEvent, glTrans, postingBatch } from "@/lib/db/schema";
+import { ORDERS_DATA_SOURCE } from "@/lib/engine/build-orders";
 import { nowIso } from "@/lib/engine/parse";
 import { type Classify, classifyOf, postEvents } from "@/lib/engine/post";
+import { findDuplicateItems, type GuardEvent } from "@/lib/engine/post-guard";
 import { chunk, deleteExceptionsByKeys, describeScope, insertExceptions, loadMasterIndex, type Scope, scopeWhere } from "./common";
 
 export interface PostSummary {
@@ -83,7 +86,55 @@ function postOne(classify: Classify, scope: Scope): PostSummary {
   summary.PostBatchID = batch.PostBatchID;
 
   try {
-    const result = postEvents(candidates, classify, index);
+    // Mọi event cùng DataSource + OrderID (mọi PostStatus, mọi scope) để kiểm tra item đã/đang chờ ghi sổ dưới khóa khác
+    const orderIdsBySource = new Map<string, Set<string>>();
+    for (const e of candidates) {
+      if (e.OrderID) orderIdsBySource.set(e.DataSource, (orderIdsBySource.get(e.DataSource) ?? new Set()).add(e.OrderID));
+    }
+    const orderEvents: GuardEvent[] = [];
+    for (const [dataSource, ids] of orderIdsBySource) {
+      for (const c of chunk([...ids], 500)) {
+        orderEvents.push(
+          ...db
+            .select({
+              AccountingEventID: accountingEvent.AccountingEventID,
+              DataSource: accountingEvent.DataSource,
+              ComCode: accountingEvent.ComCode,
+              TransactionID: accountingEvent.TransactionID,
+              SourceID: accountingEvent.SourceID,
+              OrderID: accountingEvent.OrderID,
+              ItemCodes: accountingEvent.ItemCodes,
+              PostStatus: accountingEvent.PostStatus,
+              ErrorStage: accountingEvent.ErrorStage,
+              PostedDocNum: accountingEvent.PostedDocNum,
+            })
+            .from(accountingEvent)
+            .where(and(eq(accountingEvent.DataSource, dataSource), inArray(accountingEvent.OrderID, c)))
+            .all(),
+        );
+      }
+    }
+    const duplicates = findDuplicateItems(candidates, orderEvents, [ORDERS_DATA_SOURCE]);
+
+    const result = postEvents(
+      candidates.filter((e) => !duplicates.has(e.AccountingEventID)),
+      classify,
+      index,
+    );
+    for (const e of candidates) {
+      const message = duplicates.get(e.AccountingEventID);
+      if (!message) continue;
+      result.failed.push({ AccountingEventID: e.AccountingEventID, ErrorMessage: message });
+      result.exceptions.push({
+        DataSource: e.DataSource,
+        ComCode: e.ComCode,
+        Period: e.Period,
+        Severity: "ERROR",
+        ExceptionType: "DUPLICATE_ITEM",
+        SourceKey: `EventID ${e.AccountingEventID} | ${e.TransactionID}`,
+        Message: message,
+      });
+    }
     const now = nowIso();
 
     db.transaction((tx) => {

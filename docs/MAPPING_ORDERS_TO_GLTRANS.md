@@ -316,8 +316,8 @@ Hai loại partner mà Orders dùng:
 
 **Seller**:
 - `PartnerCode` là email seller.
-- `PartnerName` phần lớn có dạng `FFT-{Store}` hoặc `FFT-FFT {Store}`. 43/1,867 dòng seller dùng tiền tố khác như `VICBEA-`, `WFF-`, `MESI PAY-`; các tên này thường **không lọc được theo store** khi một email có nhiều store, xem 5.6.
-- `PartnerTaxID` là mã định danh của seller/store, dùng để theo dõi công nợ. Cột không có ràng buộc unique. Snapshot có 7 giá trị bị trùng (17 dòng), nhưng tất cả thuộc partner loại `Supplier`; 1,867 dòng `Seller` có TaxID không trùng nhau.
+- `PartnerName` phần lớn có dạng `FFT-{Store}` hoặc `FFT-FFT {Store}`. 43/1,879 dòng seller dùng tiền tố khác như `VICBEA-`, `WFF-`, `MESI PAY-`; các tên này thường **không lọc được theo store** khi một email có nhiều store, xem 5.6.
+- `PartnerTaxID` là mã định danh của seller/store, dùng để theo dõi công nợ. Cột không có ràng buộc unique. Snapshot có 7 giá trị bị trùng (17 dòng), nhưng tất cả thuộc partner loại `Supplier`; 1,867 dòng `Seller` từ sheet có TaxID không trùng nhau; 12 seller bổ sung ngày 2026-09-17 (PartnerID 1931–1942, lấy từ file order thật) để `PartnerTaxID` NULL vì chưa có nguồn mã seller.
 
 Ví dụ seller của đơn xuyên suốt:
 
@@ -329,7 +329,7 @@ Một email có thể sở hữu nhiều store. VD `bettamax001@gmail.com` có 8
 
 ### 3.7. `Exrate`: tỷ giá
 
-Bảng có 18 dòng, tất cả đều có `ReportCurrency = USD`. Dòng của kỳ 202511:
+Bảng có 63 dòng: 18 dòng từ sheet (`ReportCurrency = USD`) và 45 dòng bổ sung ngày 2026-09-17 cho kỳ 202501–202608: `CAD/USD MUL` cho ONTARIO (Bank of Canada bình quân tháng), `VND/USD MUL` cho VICBEA (Vietcombank bình quân tháng của (mua chuyển khoản + bán)/2), nối thêm `USD/CAD DIV` 202604–202608 (xem guide §13.1). Dòng USD/CAD của kỳ 202511:
 
 | ExrateID | Period | ExrateDate | ReportCurrency (= FncCurr) | TransCurrency (= InputCurr) | RateType | Exrate | IsActive |
 |---|---|---|---|---|---|---|---|
@@ -467,7 +467,8 @@ Với từng dòng hợp lệ, tra `ItemCode` trong `RawOrders`:
 | `ItemCode` chưa có | Insert, `BuildStatus = NOT_BUILT` | `InsertedRows` |
 | Đã có, `RowHash` giống hệt | Không làm gì | `SkippedRows` |
 | Đã có, `RowHash` khác, dòng cũ `BUILT` | **Từ chối**: "Dòng đã build thành AccountingEvent và dữ liệu thay đổi → Unbuild trước khi import lại" | `ErrorRows` |
-| Đã có, `RowHash` khác, dòng cũ chưa `BUILT` | Ghi đè cả dòng, `BuildStatus = NOT_BUILT` | `ReplacedRows` |
+| Đã có, `RowHash` khác, dòng cũ chưa `BUILT` nhưng ItemCode **còn nằm trong AccountingEvent** (VD gateway bị gỡ mapping rồi Build → dòng thành `ERROR`, event POSTED được giữ; kể cả sau khi Unpost event thành NEW) | **Từ chối**: "Dòng đã ghi sổ (event …, POSTED) … → Unpost + Unbuild ComCode X kỳ P trước khi import lại" hoặc "Dòng còn nằm trong AccountingEvent chưa post … → Unbuild ComCode X kỳ P trước khi import lại" (chống ghi sổ trùng khi đổi ngày giao/cổng) | `ErrorRows` |
+| Đã có, `RowHash` khác, dòng cũ chưa `BUILT`, item chưa ghi sổ | Ghi đè cả dòng, `BuildStatus = NOT_BUILT` | `ReplacedRows` |
 
 `RowHash` tính trên **cả 46 cột**, nên chỉ cần đổi `TrackingNumber` thôi cũng bị coi là "dữ liệu thay đổi".
 
@@ -633,7 +634,7 @@ Trong file mẫu, cột `TaxID` trống ở cả 64 dòng. 11 cặp seller+store
 
 ### 5.7. Bước 2f — Tạo event: mapping từng cột
 
-Bảng dưới là **toàn bộ 38 cột** của `AccountingEvent` cho 3 event của đơn ví dụ, ở trạng thái **ngay sau Build** (chưa post).
+Bảng dưới là **toàn bộ 39 cột** của `AccountingEvent` cho 3 event của đơn ví dụ, ở trạng thái **ngay sau Build** (chưa post).
 
 | Cột | Nguồn / công thức | Event 142 (PRODUCT) | Event 143 (SHIPADD) | Event 144 (SELLER_PROFIT) |
 |---|---|---|---|---|
@@ -672,6 +673,7 @@ Bảng dưới là **toàn bộ 38 cột** của `AccountingEvent` cho 3 event c
 | `ErrorStage` | `BUILD` nếu seller lỗi | NULL | NULL | NULL |
 | `ErrorMessage` | Lý do lỗi | NULL | NULL | NULL |
 | `SourceHash` | SHA-256 (5.8) | 12CE6436…4BA6620 | 2790B9ED…3AAECE6 | F139BE72…4B27A5B |
+| `ItemCodes` | JSON các ItemCode tạo nên event (sort) — dùng chống ghi sổ trùng (5.9) | ["QVAJV-191125-Q1Z3V-1"] | (giống) | (giống) |
 | `BuildBatchID` | Lần build | 1 | 1 | 1 |
 | `AddDate` | Thời điểm insert | 2026-09-14 12:13:27 | (giống) | (giống) |
 | `ModifiedDate` | Thời điểm sửa gần nhất | NULL | NULL | NULL |
@@ -700,7 +702,7 @@ Chuỗi JSON thật của event 144:
 
 → `F139BE72FF65B2AA06BD553A48AABB26D9ECA34312DDB0A1DED3EC1D04B27A5B`
 
-Công dụng: khi **build lại** mà event đã `POSTED`, service `src/lib/services/build.ts` so `SourceHash` cũ trong DB với hash mới do engine tính. Khác nhau nghĩa là nguồn đã đổi (số tiền, partner, danh sách item...). Khi đó event POSTED vẫn được giữ nguyên, và service ghi cảnh báo `POSTED_SOURCE_CHANGED` (WARNING). `SourceHash` **không phải khóa duy nhất** và không chứa các cột tài khoản.
+Công dụng: khi **build lại**, engine `reconcileEvents` (`src/lib/engine/reconcile-events.ts`) so `SourceHash` của event `POSTED` cùng khóa với hash mới. Khác nhau nghĩa là nguồn đã đổi (số tiền, partner, danh sách item...). Khi đó event POSTED vẫn được giữ nguyên và có cảnh báo `POSTED_SOURCE_CHANGED` (WARNING); service `build.ts` ghi cảnh báo vào ExceptionLog. Việc chặn ghi sổ trùng khi khóa đổi dựa trên cột `ItemCodes`, xem 5.9. `SourceHash` **không phải khóa duy nhất** và không chứa các cột tài khoản.
 
 ### 5.9. Bước 2g — Ghi vào database
 
@@ -711,9 +713,12 @@ ComCode | DataSource | JournalTypeCode | TransactionID | EventSeq
 VD: ZENIROXPAY|ORDERS|ORD_SELLER_PROFIT_FULFILLED|ORD-QVAJV-191125-Q1Z3V-20251121|20
 ```
 
-Trong một transaction, service:
+Trong một transaction, service load event hiện có, rồi engine `reconcileEvents` (`src/lib/engine/reconcile-events.ts`) quyết định cách ghi:
 
-1. Load các event hiện có của những `SourceID` đang build.
+1. Load mọi event (mọi ComCode, mọi PostStatus) của các `OrderID` đang build, chia theo `SourceID`:
+   - SourceID đang build → đối chiếu ở bước 2–3;
+   - SourceID **đã chết** (không còn dòng raw nào, VD mọi dòng của ngày giao đó đã đổi sang ngày khác) → cũng đối chiếu ở bước 2–3 như event cũ không còn sinh lại;
+   - SourceID còn dòng raw nhưng ngoài phạm vi build → chỉ lấy event POSTED để phát hiện item đã ghi sổ.
 2. Với từng event mới sinh:
 
    | Tình huống | Xử lý | Đếm |
@@ -721,8 +726,13 @@ Trong một transaction, service:
    | Chưa có event cùng khóa | Insert | `EventsCreated` |
    | Có, đang `POSTED` | **Giữ nguyên** (không ghi đè sổ đã ghi). Nếu `SourceHash` khác thì thêm cảnh báo `POSTED_SOURCE_CHANGED` | `EventsUnchangedPosted` |
    | Có, chưa POSTED (`NEW`/`ERROR`/`SKIPPED`) | Ghi đè toàn bộ, xóa thông tin post cũ | `EventsReplaced` |
+   | **Item của event đã POSTED dưới khóa khác** trong cùng đơn (VD đổi GatewayCompanyMapping sang ComCode khác — kể cả chỉ 1 cổng của đơn nhiều cổng, đổi RuleSeq, đổi ngày giao — kể cả khi ngày cũ vẫn còn item khác) | Vẫn ghi event nhưng `PostStatus = ERROR`, `ErrorStage = BUILD` → Post **không** lấy, tránh ghi sổ trùng. Exception `POSTED_KEY_CHANGED` (ERROR) nêu event, chứng từ, ComCode + kỳ cần Unpost | `EventsBlocked` (đồng thời tính vào `EventsCreated` hoặc `EventsReplaced`) |
 
-3. Event cũ của các SourceID đó mà lần này **không sinh lại** và chưa POSTED (VD số tiền về 0): **xóa** (`EventsRemoved`).
+3. Event cũ (của SourceID đang build hoặc SourceID đã chết) mà lần này **không sinh lại**:
+   - chưa POSTED (VD số tiền về 0, hoặc event ngày giao cũ sau khi đã Unpost): **xóa** (`EventsRemoved`);
+   - đã POSTED và không có event mới nào thay chỗ: **giữ nguyên** + cảnh báo `POSTED_SOURCE_CHANGED` (WARNING).
+
+   Khi Build theo 1 ComCode, hệ thống build **trọn đơn** (OrderId + ngày giao) liên quan tới ComCode đó, gồm cả phần của ComCode khác trong đơn nhiều cổng và các đơn đang có event của ComCode đó nhưng đã chuyển công ty. Nhờ vậy không bỏ sót event cũ.
 4. Cập nhật `RawOrders`: `BuildStatus`, `BuildMessage`, `ComCode`. Đơn ví dụ → `BUILT`.
 5. Xóa exception BUILD cũ trùng khóa, rồi ghi exception mới.
 
@@ -732,7 +742,7 @@ Trong một transaction, service:
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | 1 | ORDERS | NULL | NULL | NULL | SUCCESS | 64 | 174 | 0 | 0 | 4 | NULL |
 
-**Tóm tắt trả về khi bấm Build (`BuildSummary`):** `SourceRows 64 · FulfilledRows 60 · SkippedRows 4 · ErrorRows 0 · EventsCreated 174 · EventsReplaced 0 · EventsUnchangedPosted 0 · EventsRemoved 0 · EventsError 0 · ZeroAmountSkipped 66 · Exceptions 70`.
+**Tóm tắt trả về khi bấm Build (`BuildSummary`):** `SourceRows 64 · FulfilledRows 60 · SkippedRows 4 · ErrorRows 0 · EventsCreated 174 · EventsReplaced 0 · EventsUnchangedPosted 0 · EventsRemoved 0 · EventsBlocked 0 · EventsError 0 · ZeroAmountSkipped 66 · Exceptions 70`.
 
 Build lại lần 2 khi chưa post cho `EventsCreated 0 · EventsReplaced 174`, tức là thay thế chứ không nhân đôi. Build lại sau khi đã post cho `EventsUnchangedPosted 174`.
 
@@ -751,7 +761,8 @@ Build lại lần 2 khi chưa post cho `EventsCreated 0 · EventsReplaced 174`, 
 Classify = JournalType(DataSource, JournalTypeCode).Classify   → "Single" | "Bulk"
 ```
 
-- Event `ERROR/BUILD` (VD thiếu seller) **không** được lấy. Phải sửa master rồi Build lại.
+- Event `ERROR/BUILD` **không** được lấy. Thiếu seller (`MISSING_PARTNER`): sửa master rồi Build lại. Bị chặn vì `POSTED_KEY_CHANGED`: Unpost theo ComCode + kỳ cũ nêu trong ErrorMessage → Build → Post; chỉ Build lại mà chưa Unpost thì event vẫn bị chặn.
+- **Chốt chặn ghi sổ trùng** (`src/lib/engine/post-guard.ts`): trước khi post, ứng viên được so với mọi event cùng `OrderID`. Một item chỉ thuộc 1 ngày giao và 1 công ty, nên ứng viên có item trùng với event **POSTED** hoặc event **cũng đang chờ post** mà khác `SourceID` hoặc khác `ComCode` sẽ bị giữ lại (`ERROR/POST` + exception `DUPLICATE_ITEM`); event Orders chưa có `ItemCodes` (tạo trước khi có cột) cũng bị giữ. Với dữ liệu bình thường Build đã xử lý hết nên bước này không giữ event nào (file mẫu: 0). Xử lý: Build lại rồi Post.
 - Event `ERROR/POST` được lấy lại mỗi lần Post (thử lại sau khi sửa rule, tỷ giá hoặc CoA).
 - JournalType không có Classify hợp lệ thì event **không bao giờ** được post.
 
@@ -1411,7 +1422,7 @@ Exception POST SourceKey = "EventID " + AccountingEventID + " | " + TransactionI
 | | SKIPPED | Không FULFILLED hoặc thiếu FulfilledAt |
 | | ERROR | Không map được ComCode hoặc Company |
 | `AccountingEvent.PostStatus` | NEW | Chờ post |
-| | ERROR + ErrorStage BUILD | Lỗi lúc build (thiếu seller). Post **không** lấy |
+| | ERROR + ErrorStage BUILD | Lỗi lúc build (thiếu seller; hoặc bị chặn vì nghiệp vụ đã POSTED dưới khóa khác). Post **không** lấy |
 | | ERROR + ErrorStage POST | Lỗi lúc post (thiếu rule/TK/tỷ giá...). Post lần sau **thử lại** |
 | | SKIPPED + ErrorStage POST | Bị bỏ qua lúc post theo cờ Skip |
 | | POSTED | Đã vào GLTrans |
@@ -1433,7 +1444,9 @@ Exception POST SourceKey = "EventID " + AccountingEventID + " | " + TransactionI
 | ACCOUNT_NOT_IN_COA | POST | ERROR | EventID… | TK không có trong CoA |
 | NEGATIVE_AMOUNT | POST | ERROR | EventID… | Âm với NegativeMode ERROR |
 | MISSING_FX | POST | ERROR | EventID… | Thiếu tỷ giá |
-| POSTED_SOURCE_CHANGED | BUILD | WARNING | `{TxnID}\|{JTC}` | Build lại, event đã POSTED mà SourceHash đổi |
+| POSTED_SOURCE_CHANGED | BUILD | WARNING | `{TxnID}\|{JTC}` | Build lại, event đã POSTED mà SourceHash đổi, hoặc không còn được sinh ra (số tiền về 0, rule tắt, gateway mất mapping, đổi ngày giao) |
+| POSTED_KEY_CHANGED | BUILD | ERROR | `{TxnID}\|{JTC}` | Build lại, item của event đã POSTED dưới khóa khác (đổi mapping ComCode, đổi RuleSeq, đổi ngày giao) → event mới bị giữ ERROR để không ghi sổ trùng |
+| DUPLICATE_ITEM | POST | ERROR | EventID… | Post: item đã/đang chờ ghi sổ ở event khác ngày giao hoặc khác ComCode, hoặc event chưa có ItemCodes → không post, Build lại |
 
 ---
 
@@ -1552,5 +1565,6 @@ SELECT ExceptionType, Severity, count(*) FROM ExceptionLog GROUP BY 1, 2;
 - `tests/engine/build-orders.test.ts`: 60/4 dòng, 174 event (60/58/0/56), đơn `MTUBV-181125-51MRR`, seller lỗi, gateway lạ, đơn nhiều item.
 - `tests/engine/post.test.ts`: 21 chứng từ / 42 dòng / 6,339.70, số liệu ngày 20/11, Single/REVERSE/SIGNED/ERROR/FX.
 - `tests/integration/flow.test.ts`: cả luồng trên DB tạm (import, build lại, post, unpost, unbuild).
+- `tests/engine/reconcile-events.test.ts` và `tests/integration/gateway-remap.test.ts`: build lại khi đã có event (đổi mapping/RuleSeq sau khi post không ghi sổ trùng, phạm vi Build theo ComCode).
 
 Chạy: `npm test`.

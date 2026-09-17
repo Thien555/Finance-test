@@ -1,13 +1,14 @@
 /**
  * Điều chỉnh vận hành (tài liệu §15):
  *  - Unpost          : xóa GLTrans, event POSTED → NEW
- *  - Unbuild         : xóa AccountingEvent chưa post, RawOrders → NOT_BUILT
+ *  - Unbuild         : xóa AccountingEvent chưa post, RawOrders → NOT_BUILT (trừ dòng có item còn nằm trong event chưa bị xóa)
  *  - Unpost + Unbuild: làm lần lượt 2 bước trên
  * Mọi hàm hỗ trợ preview (chỉ đếm, không sửa dữ liệu).
  */
-import { and, count, eq, gte, inArray, isNull, lte, ne, not, notInArray, or, type SQL, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lte, ne, or, type SQL, sql } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { accountingEvent, exceptionLog, glTrans, postingBatch, rawOrders } from "@/lib/db/schema";
+import { ORDERS_DATA_SOURCE } from "@/lib/engine/build-orders";
 import { nowIso } from "@/lib/engine/parse";
 import { chunk, periodOfDateColumn, type Scope, scopeWhere } from "./common";
 
@@ -77,7 +78,14 @@ export interface UnbuildResult {
   rawRowsReset: number;
 }
 
-export function unbuild(options: { scope?: Scope; includePosted?: boolean; preview?: boolean }): UnbuildResult {
+type UnbuildOptions = { scope?: Scope; includePosted?: boolean; preview?: boolean };
+
+export function unbuild(options: UnbuildOptions): UnbuildResult {
+  // Unpost + Unbuild trong 1 transaction (transaction con thành savepoint): lỗi giữa chừng thì rollback cả phần Unpost
+  return options.preview ? unbuildSteps(options) : getDb().$client.transaction(() => unbuildSteps(options))();
+}
+
+function unbuildSteps(options: UnbuildOptions): UnbuildResult {
   const db = getDb();
   const scope = options.scope ?? {};
 
@@ -91,22 +99,32 @@ export function unbuild(options: { scope?: Scope; includePosted?: boolean; previ
   const deletable = countEvents(ne(accountingEvent.PostStatus, "POSTED"));
   const postedInScope = countEvents(eq(accountingEvent.PostStatus, "POSTED"));
 
-  // Order còn event POSTED (ngoài phần sẽ bị unpost) thì raw giữ nguyên BUILT
-  const postedWhere: SQL[] = [eq(accountingEvent.PostStatus, "POSTED")];
-  if (simulateUnpost) postedWhere.push(not(and(...eventScope) ?? sql`1`));
-  const keepOrders = db
-    .selectDistinct({ id: accountingEvent.OrderID })
-    .from(accountingEvent)
-    .where(and(...postedWhere))
-    .all()
-    .map((r) => r.id)
-    .filter((x): x is string => !!x);
+  // Event bị xóa ở lần Unbuild này (preview "Unpost + Unbuild": POSTED trong scope coi như đã unpost) và event còn lại
+  const inScope = and(...eventScope) ?? sql`1`;
+  const removedNow = simulateUnpost ? inScope : and(inScope, ne(accountingEvent.PostStatus, "POSTED"))!;
+  const survives = sql`coalesce(${removedNow}, 0) = 0`;
+  const itemsOfEvents = (where: SQL) =>
+    sql`(SELECT j.value FROM ${accountingEvent}, json_each(${accountingEvent.ItemCodes}) j
+      WHERE ${accountingEvent.DataSource} = ${ORDERS_DATA_SOURCE} AND ${accountingEvent.ItemCodes} IS NOT NULL AND ${where})`;
 
   const rawWhere: SQL[] = [ne(rawOrders.BuildStatus, "NOT_BUILT")];
-  if (scope.comCode) rawWhere.push(or(eq(rawOrders.ComCode, scope.comCode), isNull(rawOrders.ComCode))!);
+  if (scope.comCode) {
+    // raw theo ComCode đang lưu, hoặc item nằm trong event bị xóa (ComCode của event có thể khác raw khi mapping đã đổi)
+    rawWhere.push(
+      or(eq(rawOrders.ComCode, scope.comCode), isNull(rawOrders.ComCode), sql`${rawOrders.ItemCode} IN ${itemsOfEvents(removedNow)}`)!,
+    );
+  }
   if (scope.periodFrom) rawWhere.push(gte(periodOfDateColumn(rawOrders.FulfilledAt), scope.periodFrom));
   if (scope.periodTo) rawWhere.push(lte(periodOfDateColumn(rawOrders.FulfilledAt), scope.periodTo));
-  const rawCondition = and(...rawWhere, ...chunk(keepOrders, 500).map((c) => notInArray(rawOrders.OrderId, c)));
+  // Item còn nằm trong event không bị xóa (POSTED, ComCode/kỳ khác) → raw giữ BUILT để import không thay được dòng đó.
+  // Event cũ chưa có ItemCodes → giữ cả đơn.
+  rawWhere.push(sql`${rawOrders.ItemCode} NOT IN ${itemsOfEvents(survives)}`);
+  rawWhere.push(
+    sql`${rawOrders.OrderId} NOT IN (SELECT ${accountingEvent.OrderID} FROM ${accountingEvent}
+      WHERE ${accountingEvent.DataSource} = ${ORDERS_DATA_SOURCE} AND ${accountingEvent.ItemCodes} IS NULL
+        AND ${accountingEvent.OrderID} IS NOT NULL AND ${survives})`,
+  );
+  const rawCondition = and(...rawWhere);
   const [{ n: rawRows }] = db.select({ n: count() }).from(rawOrders).where(rawCondition).all();
 
   const result: UnbuildResult = {

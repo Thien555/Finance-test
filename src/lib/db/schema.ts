@@ -244,6 +244,8 @@ export const accountingEvent = sqliteTable(
     ErrorStage: text("ErrorStage"), // BUILD | POST
     ErrorMessage: text("ErrorMessage"),
     SourceHash: text("SourceHash").notNull(),
+    /** JSON mảng ItemCode (đã sort) của các dòng nguồn tạo nên event — dùng chống ghi sổ trùng khi khóa event đổi. NULL = event cũ trước khi có cột */
+    ItemCodes: text("ItemCodes"),
     BuildBatchID: integer("BuildBatchID"),
     AddDate: text("AddDate").notNull(),
     ModifiedDate: text("ModifiedDate"),
@@ -253,6 +255,7 @@ export const accountingEvent = sqliteTable(
     index("IX_AccountingEvent_Status").on(t.PostStatus),
     index("IX_AccountingEvent_DocNum").on(t.PostedDocNum),
     index("IX_AccountingEvent_Source").on(t.DataSource, t.SourceID),
+    index("IX_AccountingEvent_Order").on(t.DataSource, t.OrderID),
   ],
 );
 

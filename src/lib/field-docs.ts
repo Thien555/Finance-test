@@ -71,9 +71,11 @@ export const EVENT_FIELD_DOCS: Record<string, string> = {
   PostingGroupKey: "Khóa gom Bulk khi post.",
   PostBatchID: "Lần post đã ghi sổ event này.",
   PostedAt: "Thời điểm post.",
-  ErrorStage: "Lỗi phát sinh ở bước BUILD (build lại để sửa) hay POST (post lại để thử lại).",
+  ErrorStage:
+    "Lỗi phát sinh ở bước BUILD (sửa master rồi build lại; riêng POSTED_KEY_CHANGED phải Unpost chứng từ cũ trước — xem ErrorMessage) hay POST (post lại để thử lại).",
   ErrorMessage: "Lý do lỗi/bỏ qua.",
   SourceHash: "SHA256 dữ liệu nguồn — phát hiện nguồn thay đổi sau khi đã post.",
+  ItemCodes: "Các ItemCode (dòng order) tạo nên event, dạng JSON. Dùng chặn ghi sổ trùng khi item đã POSTED dưới khóa khác (POSTED_KEY_CHANGED).",
   BuildBatchID: "Lần build đã tạo/cập nhật event.",
   AddDate: "Thời điểm tạo.",
   ModifiedDate: "Thời điểm sửa gần nhất.",

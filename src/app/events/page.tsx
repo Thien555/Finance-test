@@ -69,6 +69,8 @@ export default function EventsPage() {
               { label: "Event tạo mới", children: r.EventsCreated },
               { label: "Event thay thế (chưa post)", children: r.EventsReplaced },
               { label: "Event đã POSTED giữ nguyên", children: r.EventsUnchangedPosted },
+              { label: "Event cũ bị xóa (không còn sinh ra, chưa post)", children: r.EventsRemoved },
+              { label: "Event bị chặn (đã POSTED dưới khóa khác)", children: r.EventsBlocked },
               { label: "Event ERROR", children: r.EventsError },
               { label: "Bỏ qua do amount = 0", children: r.ZeroAmountSkipped },
               { label: "Exception ghi nhận", children: r.Exceptions },

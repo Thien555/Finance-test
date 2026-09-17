@@ -25,7 +25,12 @@ const TYPE_DOCS: Record<string, string> = {
   ACCOUNT_NOT_IN_COA: "Tài khoản không có trong CoA.",
   MISSING_FX: "Thiếu tỷ giá trong Exrate cho kỳ/đồng tiền → bổ sung rồi Post lại.",
   NEGATIVE_AMOUNT: "Amount âm với NegativeMode = ERROR.",
-  POSTED_SOURCE_CHANGED: "Event đã post nhưng dữ liệu nguồn/cấu hình đổi → Unpost + Build + Post lại nếu cần.",
+  POSTED_SOURCE_CHANGED:
+    "Event đã post nhưng dữ liệu nguồn/cấu hình đổi, hoặc lần Build này không còn sinh ra event đó (số tiền về 0, rule tắt, gateway mất mapping, đổi ngày giao) → Unpost + Build + Post lại nếu cần.",
+  POSTED_KEY_CHANGED:
+    "Item đã ghi sổ nhưng khóa event đổi (đổi GatewayCompanyMapping sang ComCode khác, đổi RuleSeq, đổi ngày giao...) → event mới bị giữ ERROR để không ghi sổ trùng. Unpost theo ComCode + kỳ cũ nêu trong message rồi Build (gồm cả kỳ/ComCode mới nếu message ghi) + Post lại; Build tự xóa event cũ không còn dòng nguồn.",
+  DUPLICATE_ITEM:
+    "Chốt chặn lúc Post: item của event đã ghi sổ (hoặc đang chờ post) ở event khác ngày giao / khác công ty, hoặc event tạo trước khi có cột ItemCodes → không post. Build lại (phạm vi gồm cả event kia) để đối chiếu rồi Post.",
 };
 
 export default function ExceptionsPage() {

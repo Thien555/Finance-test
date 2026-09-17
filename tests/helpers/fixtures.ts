@@ -72,6 +72,7 @@ export function toEventRows(drafts: EventDraft[], startId = 1000): AccountingEve
     PostedAt: null,
     ErrorStage: null,
     ErrorMessage: null,
+    ItemCodes: null,
     BuildBatchID: 1,
     AddDate: "2026-01-01 00:00:00",
     ModifiedDate: null,

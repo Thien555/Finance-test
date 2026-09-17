@@ -14,7 +14,7 @@ Web kế toán cho công ty dropshipping: **file order thô → RawOrders → (B
 
 ## Bản đồ code
 
-- `src/lib/engine/` – logic nghiệp vụ thuần, không DB (`build-orders.ts`, `post.ts`, `resolve-partner.ts`, `resolve-fx.ts`, `keys.ts`, `parse.ts`, `masters.ts`)
+- `src/lib/engine/` – logic nghiệp vụ thuần, không DB (`build-orders.ts`, `reconcile-events.ts`, `post.ts`, `post-guard.ts`, `resolve-partner.ts`, `resolve-fx.ts`, `keys.ts`, `parse.ts`, `masters.ts`)
 - `src/lib/services/` – đọc/ghi DB, transaction, batch log (`import-orders`, `build`, `post`, `clear`, `queries`, `export`, `master`)
 - `src/app/api/**/route.ts` – route mỏng, bọc `handle()` từ `src/lib/api.ts`
 - `src/app/**/page.tsx` – màn hình client antd; helper ở `src/components/client.ts`, `src/components/ui.tsx`
