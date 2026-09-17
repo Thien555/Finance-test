@@ -3,6 +3,7 @@
 > Tài liệu kỹ thuật cho người/AI tiếp tục phát triển hoặc fix bug. Viết tiếng Việt, giữ nguyên tên bảng/cột/hàm/file.
 > **Quy tắc:** khi thay đổi hành vi code, cập nhật mục tương ứng trong file này cùng lúc.
 > Tài liệu nghiệp vụ gốc (yêu cầu tổng thể, chưa làm hết): [`tai lieu du an.md`](../tai%20lieu%20du%20an.md).
+> Đặc tả nghiệp vụ ngắn (BA) cho luồng Order → GLTrans, có sơ đồ tổng quan: [`BA_ORDERS_TO_GLTRANS.md`](BA_ORDERS_TO_GLTRANS.md).
 
 ## Mục lục
 
