@@ -274,7 +274,21 @@ File `src/lib/db/schema.ts`. **Tên bảng/cột PascalCase giữ đúng như sh
 | `GLTrans` | `ID` | Đúng 33 cột sheet GlTrans. Index `DocNum`, `PostBatchID`, (`ComCode`,`Period`) |
 | `ExceptionLog` | `ID` | `BatchType` (IMPORT/BUILD/POST), `BatchID`, `DataSource`, `ComCode`, `Period`, `Severity` (INFO/WARNING/ERROR), `ExceptionType`, `SourceKey`, `Message`, `CreatedAt` |
 
-Không có foreign key; liên kết qua giá trị: `GLTrans.DocNum` ↔ `AccountingEvent.PostedDocNum`; `AccountingEvent.OrderID` + `PostingDate` ↔ `RawOrders.OrderId` + `FulfilledAt`.
+Không có foreign key; liên kết qua giá trị:
+
+| Từ | Sang | Ghi chú |
+|---|---|---|
+| `GLTrans.DocNum` | `AccountingEvent.PostedDocNum` | Liên kết chính GL ↔ event. Bulk: nhiều event 1 DocNum |
+| `GLTrans.PostingGroupKey` | `AccountingEvent.PostingGroupKey` | Chỉ Bulk; Single để null |
+| `GLTrans.ReferenceTxnID` | `AccountingEvent.TransactionID` | Chỉ Single; Bulk để null |
+| `AccountingEvent.OrderID` + `PostingDate` | `RawOrders.OrderId` + `FulfilledAt` | Cách join thực tế ở `eventDetail`/`glDocumentDetail` |
+| `AccountingEvent.ItemCodes` (JSON) | `RawOrders.ItemCode` (unique) | **n-n**, liên kết event → dòng raw duy nhất được vật chất hóa; truy vấn bằng `json_each` |
+| `RawOrders.ImportBatchID` | `ImportBatch.ImportBatchID` | |
+| `AccountingEvent.BuildBatchID` / `PostBatchID` | `BuildBatch` / `PostingBatch` | `PostBatchID` về null khi Unpost |
+| `GLTrans.PostBatchID` | `PostingBatch.PostBatchID` | notNull |
+| `ExceptionLog.BatchType` + `BatchID` | `BuildBatch` / `PostingBatch` | Polymorphic; `IMPORT` chưa có caller |
+
+Sơ đồ toàn cảnh 15 bảng + ERD 5 bảng lõi: [`BA_ORDERS_TO_GLTRANS.md` § Sơ đồ quan hệ dữ liệu](BA_ORDERS_TO_GLTRANS.md#sơ-đồ-quan-hệ-dữ-liệu). Chuỗi tra cứu master: [`MAPPING_ORDERS_TO_GLTRANS.md` §12.1](MAPPING_ORDERS_TO_GLTRANS.md).
 
 ### 4.3 Kết nối, migrate, seed
 - `getDb()` (`src/lib/db/client.ts`): mở `DATABASE_PATH` hoặc `data/finance.db`, bật WAL, chạy `migrate()` với `drizzle/`, gọi `seedMastersIfEmpty()` (nếu `JournalType` rỗng → nạp snapshot; nếu `Company`/`GatewayCompanyMapping` rỗng → nạp mặc định). Instance cache trên `globalThis.__financeDb` (sống qua HMR).

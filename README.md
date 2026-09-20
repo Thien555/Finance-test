@@ -31,7 +31,7 @@ File order ──(1) Import──► RawOrders ──(2) Build──► Accounti
                          ImportBatch             BuildBatch + Exception    PostingBatch
 ```
 
-- **AccountingEvent** – "phiếu nghiệp vụ chuẩn hóa": 1 dòng = 1 giao dịch × 1 JournalLineRule. Có sẵn ngày, kỳ, số tiền, TK, partner nhưng **chưa tách Nợ/Có**. Dùng để kiểm tra lỗi (thiếu seller, thiếu rule…) và build lại mà không đụng sổ cái.
+- **AccountingEvent** – "event nghiệp vụ chuẩn hóa": 1 dòng = 1 giao dịch × 1 JournalLineRule. Có sẵn ngày, kỳ, số tiền, TK, partner nhưng **chưa tách Nợ/Có**. Dùng để kiểm tra lỗi (thiếu seller, thiếu rule…) và build lại mà không đụng sổ cái.
 - **PostingBatch** – nhật ký 1 lần bấm Post (phạm vi, Single/Bulk, trạng thái, số dòng GL). Mỗi dòng GL có `PostBatchID` để truy vết/Unpost theo lô.
 - **GLTrans** – mỗi dòng là 1 vế Nợ hoặc Có; các dòng cùng `DocNum` luôn cân.
 

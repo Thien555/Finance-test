@@ -187,6 +187,8 @@ Với file mẫu:
                    (4 dòng UNFULFILLED bị bỏ qua)     (240 khả năng − 66 khoản bằng 0)
 ```
 
+Bản vẽ của cùng nội dung này, kèm cả 15 bảng và các cột dùng để nối: [`BA_ORDERS_TO_GLTRANS.md` § Sơ đồ quan hệ dữ liệu](BA_ORDERS_TO_GLTRANS.md#sơ-đồ-quan-hệ-dữ-liệu).
+
 ### 2.3. Ví dụ xuyên suốt
 
 Phần 4 → 7 bám theo **một đơn thật**: `QVAJV-191125-Q1Z3V`, store `JJC`, seller `nqcuong.0525@gmail.com`, giao ngày 21/11/2025. Đơn này được chọn vì:
@@ -491,7 +493,7 @@ Import file mẫu lần thứ 2 cho kết quả `InsertedRows = 0, SkippedRows =
 
 ### 5.1. AccountingEvent là gì và vì sao cần tầng này
 
-Một AccountingEvent là **"phiếu nghiệp vụ đã chuẩn hóa"**: 1 giao dịch nguồn × 1 quy tắc (JournalLineRule). Event đã có đủ ngày, kỳ, số tiền, các tài khoản theo vai trò và partner, nhưng **chưa quyết định dòng Nợ, dòng Có** và **chưa gom chứng từ**.
+Một AccountingEvent là **"event nghiệp vụ đã chuẩn hóa"**: 1 giao dịch nguồn × 1 quy tắc (JournalLineRule). Event đã có đủ ngày, kỳ, số tiền, các tài khoản theo vai trò và partner, nhưng **chưa quyết định dòng Nợ, dòng Có** và **chưa gom chứng từ**.
 
 Tầng này tồn tại để:
 
@@ -1496,7 +1498,7 @@ Exception POST SourceKey = "EventID " + AccountingEventID + " | " + TransactionI
 | RawOrders | Bảng chứa dòng order sau chuẩn hóa, khóa `ItemCode` |
 | ImportBatch / BuildBatch / PostingBatch | Nhật ký một lần Import / Build / Post |
 | ExceptionLog | Nhật ký ngoại lệ (dòng bị loại, lỗi mapping, lỗi post...) |
-| AccountingEvent | Phiếu nghiệp vụ chuẩn hóa: 1 giao dịch × 1 rule; có tài khoản vai trò, chưa tách Nợ/Có |
+| AccountingEvent | Event nghiệp vụ chuẩn hóa: 1 giao dịch × 1 rule; có tài khoản vai trò, chưa tách Nợ/Có |
 | JournalType | Cấu hình header nghiệp vụ: tài khoản theo vai trò, partner rule, Single/Bulk |
 | JournalTypeCode (JTC) | Mã nghiệp vụ chuẩn, VD `ORD_REV_PRODUCT_FULFILLED` |
 | JournalLineRule | Quy tắc sinh 1 cặp Nợ/Có: vai trò nào bên Nợ/Có, lấy tiền nào, xử lý số âm |

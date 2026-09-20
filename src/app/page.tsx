@@ -195,7 +195,7 @@ function FlowExplain() {
           { layer: "RawOrders", what: "Bản sao file upload, mỗi dòng = 1 item (khóa ItemCode).", why: "Truy vết ngược về dữ liệu gốc." },
           {
             layer: "AccountingEvent",
-            what: "“Phiếu nghiệp vụ chuẩn hóa”: 1 dòng = 1 giao dịch × 1 JournalLineRule. Đã có ComCode, ngày, kỳ, số tiền signed, các TK (Contra/Trans/Bank/Fee), partner — nhưng CHƯA tách Nợ/Có.",
+            what: "“Event nghiệp vụ chuẩn hóa”: 1 dòng = 1 giao dịch × 1 JournalLineRule. Đã có ComCode, ngày, kỳ, số tiền signed, các TK (Contra/Trans/Bank/Fee), partner — nhưng CHƯA tách Nợ/Có.",
             why: "Lớp kiểm tra trước khi ghi sổ: thấy lỗi (thiếu seller, thiếu rule…), sửa mapping rồi Build lại mà không đụng sổ cái.",
           },
           {
