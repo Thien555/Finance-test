@@ -1938,3 +1938,12 @@ PartnerID,PartnerType,PartnerTaxID,PartnerCode,PartnerName,BankAccount,BankType,
 1940,Seller,NULL,phanvansang08092003@gmail.com,FFT-NLQ,NULL,PingPong,NULL,NULL,NULL,1,NULL
 1941,Seller,NULL,hackerml.vni01@gmail.com,FFT-JNS,NULL,PingPong,NULL,NULL,NULL,1,NULL
 1942,Seller,NULL,chipmedia2020@gmail.com,FFT-NLS,NULL,PingPong,NULL,NULL,NULL,1,NULL
+1943,OTHER,NULL,Paypal ZeniroxPay,PayPal ZeniroxPay,NULL,PayPal,NULL,NULL,NULL,1,NULL
+1944,OTHER,NULL,Stripe ZeniroxPay,Stripe ZeniroxPay,NULL,Stripe,NULL,NULL,NULL,1,NULL
+1945,OTHER,NULL,Pingpong ZeniroxPay,PingPong ZeniroxPay,NULL,PingPong,NULL,NULL,NULL,1,NULL
+1946,OTHER,NULL,MasterCard ZENIROXPAY,MasterCard ZeniroxPay,NULL,MasterCard,NULL,NULL,NULL,1,NULL
+1947,OTHER,NULL,ZENIROXPAY,ZeniroxPay Inc.,NULL,NULL,NULL,NULL,NULL,1,NULL
+1948,OTHER,NULL,RoyalBank,Royal Bank of Canada,NULL,NULL,NULL,NULL,NULL,1,NULL
+1949,Supplier,NULL,OneAccounting,OneAccounting,NULL,NULL,NULL,NULL,NULL,1,NULL
+1950,OTHER,NULL,BANK,Bank,NULL,NULL,NULL,NULL,NULL,1,NULL
+1951,OTHER,NULL,Royal Bank,Royal Bank of Canada,NULL,NULL,NULL,NULL,NULL,1,NULL

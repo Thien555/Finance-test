@@ -16,8 +16,14 @@ import {
   mappingBankAccount,
   partners,
   postingBatch,
+  rawAccountingSource,
   rawOrders,
+  rawPaypal,
+  rawPipo,
+  rawStripe,
 } from "@/lib/db/schema";
+import { ORDERS_DATA_SOURCE } from "@/lib/engine/build-orders";
+import { SOURCE_META, type SourceKey } from "@/lib/sources/columns";
 import { periodOfDateColumn, type Scope, scopeWhere } from "./common";
 
 export interface Paging {
@@ -123,7 +129,12 @@ export function glDocumentDetail(docNum: string) {
   const db = getDb();
   const lines = db.select().from(glTrans).where(eq(glTrans.DocNum, docNum)).orderBy(asc(glTrans.ID)).all();
   const events = db.select().from(accountingEvent).where(eq(accountingEvent.PostedDocNum, docNum)).orderBy(asc(accountingEvent.AccountingEventID)).all();
-  const orderIds = [...new Set(events.map((e) => e.OrderID).filter((x): x is string => !!x))].slice(0, 500);
+  // Chỉ nguồn ORDERS mới truy được về RawOrders; nguồn ngân hàng/PSP có bảng raw riêng
+  const orderIds = [
+    ...new Set(
+      events.filter((e) => e.DataSource === ORDERS_DATA_SOURCE).map((e) => e.OrderID).filter((x): x is string => !!x),
+    ),
+  ].slice(0, 500);
   const orders = orderIds.length
     ? db.select().from(rawOrders).where(inArray(rawOrders.OrderId, orderIds)).orderBy(asc(rawOrders.OrderId)).all()
     : [];
@@ -185,13 +196,14 @@ export function eventDetail(id: number) {
   const db = getDb();
   const event = db.select().from(accountingEvent).where(eq(accountingEvent.AccountingEventID, id)).get();
   if (!event) return null;
-  const orders = event.OrderID
-    ? db
+  const orders =
+    event.OrderID && event.DataSource === ORDERS_DATA_SOURCE
+      ? db
         .select()
         .from(rawOrders)
         .where(and(eq(rawOrders.OrderId, event.OrderID), eq(rawOrders.FulfilledAt, event.PostingDate)))
         .all()
-    : [];
+      : [];
   const rule = db
     .select()
     .from(journalLineRule)
@@ -235,6 +247,50 @@ export function listRawOrders(f: RawFilter) {
   return { rows, total };
 }
 
+/** Bảng raw của các nguồn ngoài Orders — mọi bảng đều có cùng bộ cột quản trị nên dùng chung 1 hàm */
+const RAW_SOURCE_TABLES = {
+  paypal: { table: rawPaypal, id: rawPaypal.RawPaypalID, search: [rawPaypal.SourceKey, rawPaypal.TransactionID, rawPaypal.InvoiceID, rawPaypal.PartnerCode, rawPaypal.StoreName] },
+  stripe: { table: rawStripe, id: rawStripe.RawStripeID, search: [rawStripe.SourceKey, rawStripe.Id, rawStripe.MetaInvoiceId, rawStripe.PartnerCode, rawStripe.StoreName] },
+  pipo: { table: rawPipo, id: rawPipo.RawPipoID, search: [rawPipo.SourceKey, rawPipo.TransactionId, rawPipo.PartnerCode, rawPipo.StoreName, rawPipo.FromTo] },
+  "accounting-source": {
+    table: rawAccountingSource,
+    id: rawAccountingSource.RawAccountingSourceID,
+    search: [rawAccountingSource.SourceKey, rawAccountingSource.IDTransaction, rawAccountingSource.PartnerCode, rawAccountingSource.Description, rawAccountingSource.SheetName],
+  },
+} as const;
+
+export interface RawSourceFilter extends Paging {
+  search?: string | null;
+  comCode?: string | null;
+  buildStatus?: string | null;
+  journalType?: string | null;
+  importBatchId?: number | null;
+  periodFrom?: string | null;
+  periodTo?: string | null;
+}
+
+export function listRawSource(source: SourceKey, f: RawSourceFilter) {
+  const db = getDb();
+  const { table, id, search } = RAW_SOURCE_TABLES[source];
+  const t = table as unknown as (typeof rawPaypal);
+  const where = whereOf([
+    likeAny(f.search, ...(search as unknown as Parameters<typeof like>[0][])),
+    f.comCode ? eq(t.ComCode, f.comCode) : undefined,
+    f.buildStatus ? eq(t.BuildStatus, f.buildStatus) : undefined,
+    f.journalType ? eq(t.JournalType, f.journalType) : undefined,
+    f.importBatchId ? eq(t.ImportBatchID, f.importBatchId) : undefined,
+    f.periodFrom ? gte(periodOfDateColumn(t.PostingDate), f.periodFrom) : undefined,
+    f.periodTo ? lte(periodOfDateColumn(t.PostingDate), f.periodTo) : undefined,
+  ]);
+  const { limit, offset } = paging(f);
+  const idCol = id as unknown as (typeof rawPaypal.RawPaypalID);
+  const rows = db.select().from(t).where(where).orderBy(asc(idCol)).limit(limit).offset(offset).all();
+  const [{ total }] = db.select({ total: count() }).from(t).where(where).all();
+  const byStatus = db.select({ k: t.BuildStatus, n: count() }).from(t).groupBy(t.BuildStatus).all();
+  const journalTypes = db.selectDistinct({ v: t.JournalType }).from(t).orderBy(asc(t.JournalType)).all().map((r) => r.v);
+  return { rows: rows as Record<string, unknown>[], total, byStatus, journalTypes: journalTypes.filter((v): v is string => !!v) };
+}
+
 export const listImportBatches = () => getDb().select().from(importBatch).orderBy(desc(importBatch.ImportBatchID)).all();
 export const listBuildBatches = () => getDb().select().from(buildBatch).orderBy(desc(buildBatch.BuildBatchID)).all();
 export const listPostingBatches = () => getDb().select().from(postingBatch).orderBy(desc(postingBatch.PostBatchID)).all();
@@ -274,6 +330,17 @@ export function dashboardStats() {
   const db = getDb();
   const group = <T extends string>(rows: { k: T | null; n: number }[]) => Object.fromEntries(rows.map((r) => [r.k ?? "", r.n]));
   const raw = group(db.select({ k: rawOrders.BuildStatus, n: count() }).from(rawOrders).groupBy(rawOrders.BuildStatus).all());
+  // Số dòng raw của từng nguồn ngoài Orders + số event/GL theo DataSource
+  const rawBySource = Object.fromEntries(
+    (Object.keys(RAW_SOURCE_TABLES) as SourceKey[]).map((key) => {
+      const t = RAW_SOURCE_TABLES[key].table as unknown as typeof rawPaypal;
+      return [key, group(db.select({ k: t.BuildStatus, n: count() }).from(t).groupBy(t.BuildStatus).all())];
+    }),
+  );
+  const eventsBySource = group(
+    db.select({ k: accountingEvent.DataSource, n: count() }).from(accountingEvent).groupBy(accountingEvent.DataSource).all(),
+  );
+  const glBySource = group(db.select({ k: glTrans.DataSource, n: count() }).from(glTrans).groupBy(glTrans.DataSource).all());
   const events = group(db.select({ k: accountingEvent.PostStatus, n: count() }).from(accountingEvent).groupBy(accountingEvent.PostStatus).all());
   const [gl] = db
     .select({
@@ -287,6 +354,9 @@ export function dashboardStats() {
   const exceptions = group(db.select({ k: exceptionLog.Severity, n: count() }).from(exceptionLog).groupBy(exceptionLog.Severity).all());
   return {
     raw,
+    rawBySource,
+    eventsBySource,
+    glBySource,
     rawTotal: Object.values(raw).reduce((a, b) => a + b, 0),
     events,
     eventsTotal: Object.values(events).reduce((a, b) => a + b, 0),
@@ -307,10 +377,21 @@ export function filterOptions() {
       .from(journalType)
       .orderBy(asc(journalType.DataSource), asc(journalType.JournalTypeCode))
       .all(),
+    dataSources: [
+      ...new Set([
+        ORDERS_DATA_SOURCE,
+        ...(Object.keys(RAW_SOURCE_TABLES) as SourceKey[]).map((k) => SOURCE_META[k].dataSource),
+        ...db.selectDistinct({ v: accountingEvent.DataSource }).from(accountingEvent).all().map((r) => r.v),
+      ]),
+    ].sort(),
     periods: [
       ...new Set([
         ...db.selectDistinct({ p: accountingEvent.Period }).from(accountingEvent).all().map((r) => r.p),
         ...db.selectDistinct({ p: periodOfDateColumn(rawOrders.FulfilledAt) }).from(rawOrders).all().map((r) => r.p),
+        ...(Object.keys(RAW_SOURCE_TABLES) as SourceKey[]).flatMap((k) => {
+          const t = RAW_SOURCE_TABLES[k].table as unknown as typeof rawPaypal;
+          return db.selectDistinct({ p: periodOfDateColumn(t.PostingDate) }).from(t).all().map((r) => r.p);
+        }),
       ]),
     ]
       .filter((p) => p && /^\d{6}$/.test(p))

@@ -7,6 +7,10 @@ export type ExceptionType =
   | "INVALID_FULFILLED_DATE"
   | "MISSING_COMCODE"
   | "MISSING_COMPANY"
+  /** Dòng nguồn ngân hàng/PSP bị loại theo điều kiện của nguồn (non-USD, PIPO Status ≠ Success…) */
+  | "SOURCE_ROW_SKIPPED"
+  /** Dòng nguồn thiếu dữ liệu bắt buộc để ghi sổ (ngày, số tiền, JournalType…) */
+  | "INVALID_SOURCE_ROW"
   | "MISSING_JOURNAL_TYPE"
   | "MISSING_RULE"
   | "UNKNOWN_AMOUNT_SOURCE"
@@ -35,8 +39,8 @@ export type EventDraft = Omit<
   AccountingEventInsert,
   "AccountingEventID" | "BuildBatchID" | "AddDate" | "ModifiedDate" | "PostBatchID" | "PostedAt" | "PostedDocNum" | "PostingGroupKey"
 > & {
-  /** RawOrderID của các dòng order tạo nên event (để truy vết) */
-  rawOrderIds: number[];
+  /** Khóa chính của các dòng raw tạo nên event (RawOrderID / RawPaypalID / …) — để truy vết */
+  rawRowIds: number[];
 };
 
 /** Dòng GL chưa có ID / PostBatchID / AddDate (engine Post sinh ra) */

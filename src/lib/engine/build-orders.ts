@@ -61,7 +61,7 @@ interface OrderGroup {
   taxId: string | null;
   storeName: string | null;
   itemCodes: string[];
-  rawOrderIds: number[];
+  rawRowIds: number[];
 }
 
 export type RawBuildStatus = "BUILT" | "SKIPPED" | "ERROR";
@@ -189,7 +189,7 @@ export function buildOrderEvents(rows: OrderSourceRow[], index: MasterIndex): Bu
         taxId: row.TaxID,
         storeName: row.StoreName,
         itemCodes: [],
-        rawOrderIds: [],
+        rawRowIds: [],
       };
       groups.set(key, g);
     }
@@ -198,7 +198,7 @@ export function buildOrderEvents(rows: OrderSourceRow[], index: MasterIndex): Bu
     g.tax = g.tax.plus(d(row.TaxFee));
     g.profit = g.profit.plus(d(row.Profit));
     g.itemCodes.push(row.ItemCode);
-    g.rawOrderIds.push(row.RawOrderID);
+    g.rawRowIds.push(row.RawOrderID);
     rawStatus.set(row.RawOrderID, { status: "BUILT", message: null, comCode });
   }
 
@@ -335,7 +335,7 @@ export function buildOrderEvents(rows: OrderSourceRow[], index: MasterIndex): Bu
             items: [...g.itemCodes].sort(),
           }),
           ItemCodes: JSON.stringify([...g.itemCodes].sort()),
-          rawOrderIds: g.rawOrderIds,
+          rawRowIds: g.rawRowIds,
         });
       }
     }

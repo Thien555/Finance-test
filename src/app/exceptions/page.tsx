@@ -15,13 +15,20 @@ interface ExceptionList {
 
 const TYPE_DOCS: Record<string, string> = {
   NOT_FULFILLED: "Order chưa FULFILLED hoặc thiếu FulfilledAt → không ghi nhận (bình thường).",
+  SOURCE_ROW_SKIPPED:
+    "Dòng nguồn ngân hàng/PSP bị loại theo điều kiện của nguồn: PayPal/Stripe chỉ ghi sổ USD, PIPO chỉ ghi sổ Status = Success (bình thường).",
+  INVALID_SOURCE_ROW: "Dòng nguồn thiếu dữ liệu bắt buộc để ghi sổ (không đọc được ngày, thiếu số tiền...) → sửa file rồi import lại.",
+  UNKNOWN_AMOUNT_SOURCE: "JournalLineRule đòi một AmountSource mà nguồn này không có (VD rule dùng GROSS nhưng nguồn chỉ có AMOUNT).",
   AMOUNT_ZERO: "Số tiền = 0 và rule có SkipIfAmountZero → không tạo event (bình thường).",
   MISSING_COMCODE: "PaymentGatewayName chưa map ComCode → thêm ở Master → GatewayCompanyMapping rồi Build lại.",
   MISSING_COMPANY: "ComCode chưa có trong bảng Company.",
-  MISSING_PARTNER: "Seller không tìm thấy/không xác định được store trong Partners → bổ sung Partners (Sync sheet) rồi Build lại.",
-  MISSING_JOURNAL_TYPE: "Thiếu cấu hình JournalType.",
+  MISSING_PARTNER:
+    "Không tìm thấy đối tượng trong Partners (Orders: seller; nguồn ngân hàng/PSP: mã ở cột PartnerCode) → bổ sung Partners (Sync sheet) rồi Build lại. Với nguồn ngân hàng/PSP đây là cảnh báo: vẫn ghi sổ với mã đó nhưng PartnerTaxID trống.",
+  MISSING_JOURNAL_TYPE:
+    "Thiếu cấu hình JournalType. Với nguồn ngân hàng/PSP: mã ở cột JournalType bạn điền tay chưa có trong master (hoặc cột để trống mà loại giao dịch gốc cũng không map được) → thêm dòng JournalType rồi Build lại.",
   MISSING_RULE: "Thiếu JournalLineRule active.",
-  MISSING_ACCOUNT: "Rule trỏ tới account trống trên JournalType.",
+  MISSING_ACCOUNT:
+    "Rule trỏ tới account trống trên JournalType. Với nguồn ngân hàng/PSP đây thường là bình thường: bộ 3 rule dùng chung, JournalType không khai TransAccount thì rule pair 2 tự bị bỏ.",
   ACCOUNT_NOT_IN_COA: "Tài khoản không có trong CoA.",
   MISSING_FX: "Thiếu tỷ giá trong Exrate cho kỳ/đồng tiền → bổ sung rồi Post lại.",
   NEGATIVE_AMOUNT: "Amount âm với NegativeMode = ERROR.",

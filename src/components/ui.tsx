@@ -84,12 +84,34 @@ export interface ScopeValue {
   comCode?: string;
   periodFrom?: string;
   periodTo?: string;
+  dataSource?: string;
 }
 
-/** Chọn phạm vi: ComCode + khoảng kỳ */
-export function ScopeBar({ value, onChange, options }: { value: ScopeValue; onChange: (v: ScopeValue) => void; options: FilterOptions | null }) {
+/** Chọn phạm vi: nguồn dữ liệu + ComCode + khoảng kỳ */
+export function ScopeBar({
+  value,
+  onChange,
+  options,
+  showDataSource = true,
+}: {
+  value: ScopeValue;
+  onChange: (v: ScopeValue) => void;
+  options: FilterOptions | null;
+  /** Ẩn ô chọn nguồn ở màn hình chỉ có 1 nguồn */
+  showDataSource?: boolean;
+}) {
   return (
     <Space wrap>
+      {showDataSource && (
+        <Select
+          allowClear
+          placeholder="Nguồn (tất cả)"
+          style={{ width: 200 }}
+          value={value.dataSource}
+          onChange={(dataSource) => onChange({ ...value, dataSource })}
+          options={(options?.dataSources ?? []).map((v) => ({ value: v, label: v }))}
+        />
+      )}
       <Select
         allowClear
         placeholder="ComCode (tất cả)"

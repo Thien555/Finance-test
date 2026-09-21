@@ -163,12 +163,12 @@ export function runBuildOrders(scope: Scope = {}): BuildSummary {
 
       const plan = reconcileEvents({ drafts: result.events, existing, relatedPosted, deadSourceIds });
 
-      for (const { rawOrderIds: _raw, ...draft } of plan.insert) {
+      for (const { rawRowIds: _raw, ...draft } of plan.insert) {
         tx.insert(accountingEvent).values({ ...draft, BuildBatchID: batch.BuildBatchID, AddDate: now }).run();
       }
       for (const {
         id,
-        draft: { rawOrderIds: _raw, ...draft },
+        draft: { rawRowIds: _raw, ...draft },
       } of plan.replace) {
         tx.update(accountingEvent)
           .set({

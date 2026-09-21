@@ -67,6 +67,7 @@ export function useApi<T>(url: string | null) {
 export interface FilterOptions {
   comCodes: { value: string; label: string | null }[];
   journalTypeCodes: { value: string; dataSource: string }[];
+  dataSources: string[];
   periods: string[];
   postBatches: { value: number; classify: string; status: string }[];
 }

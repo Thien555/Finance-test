@@ -15,6 +15,16 @@ export const orderTransactionId = (orderId: string, postingDate: string) => `ORD
 /** AccountingEvent.SourceID của Orders: {OrderId}|{yyyyMMdd} */
 export const orderSourceId = (orderId: string, postingDate: string) => `${orderId}|${ymd(postingDate)}`;
 
+/**
+ * AccountingEvent.TransactionID của nguồn ngân hàng/PSP = mã giao dịch gốc trên file.
+ * Khóa event đã gồm JournalTypeCode nên mã trùng ở 2 loại nghiệp vụ khác nhau vẫn hợp lệ
+ * (PayPal có 37 mã trùng kiểu Hold → Cancel Hold).
+ */
+export const bankTransactionId = (nativeId: string) => nativeId.trim();
+
+/** AccountingEvent.SourceID của nguồn ngân hàng/PSP: {DataSource}|{SourceKey của dòng raw} */
+export const bankSourceId = (dataSource: string, sourceKey: string) => `${dataSource}|${sourceKey}`;
+
 /** DocNum Post Single: ASI-{yyyyMMdd}-{AccountingEventID} */
 export const singleDocNum = (postingDate: string, eventId: number) => `ASI-${ymd(postingDate)}-${eventId}`;
 

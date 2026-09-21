@@ -32,6 +32,41 @@ export function resolveFixedPartner(index: MasterIndex, code: string): ResolvedP
   return found ? toResolved(found) : { PartnerCode: code, PartnerTaxID: null, PartnerName: null };
 }
 
+export interface CodeResolveResult {
+  partner: ResolvedPartner;
+  /** Tìm thấy trong Partners (có PartnerTaxID để gắn công nợ) */
+  matched: boolean;
+  /** 1 mã ứng nhiều partner mà StoreName không tách được → đã chọn dòng đầu, cần cảnh báo */
+  ambiguous: boolean;
+}
+
+/**
+ * Partner lấy thẳng từ cột PartnerCode trên nguồn (tài liệu §7.2 bước 4 — AccountingSource/PayPal/PIPO/Stripe).
+ * Khác `resolveSeller`: nguồn ngân hàng/PSP đã ghi sẵn mã đối tượng (VD "RoyalBank", "Paypal ZeniroxPay",
+ * hoặc email seller), không suy từ TaxID trên dòng. 1 email seller có nhiều store thì lọc tiếp bằng StoreName.
+ * Không có trong Partners vẫn ghi sổ với mã đó nhưng `matched = false` → build ghi cảnh báo
+ * (PartnerTaxID trống thì công nợ không gắn được đối tượng).
+ */
+export function resolvePartnerByCode(
+  index: MasterIndex,
+  code: string | null | undefined,
+  storeName?: string | null,
+): CodeResolveResult {
+  const value = code?.trim();
+  if (!value) {
+    return { partner: { PartnerCode: null, PartnerTaxID: null, PartnerName: null }, matched: false, ambiguous: false };
+  }
+  const all = index.partnersByCodeOf(value);
+  if (all.length === 0) {
+    return { partner: { PartnerCode: value, PartnerTaxID: null, PartnerName: null }, matched: false, ambiguous: false };
+  }
+  if (all.length === 1) return { partner: toResolved(all[0]), matched: true, ambiguous: false };
+
+  const byStore = storeName ? all.filter((p) => storeNameMatches(p.PartnerName, storeName)) : [];
+  if (byStore.length === 1) return { partner: toResolved(byStore[0]), matched: true, ambiguous: false };
+  return { partner: toResolved(all.find((p) => !!p.PartnerTaxID) ?? all[0]), matched: true, ambiguous: true };
+}
+
 function storeNameMatches(partnerName: string | null, storeName: string): boolean {
   if (!partnerName) return false;
   const name = partnerName.trim().toUpperCase();

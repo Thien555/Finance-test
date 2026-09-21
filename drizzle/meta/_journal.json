@@ -15,6 +15,13 @@
       "when": 1789616446319,
       "tag": "0001_eager_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789974858941,
+      "tag": "0002_smart_justice",
+      "breakpoints": true
     }
   ]
 }

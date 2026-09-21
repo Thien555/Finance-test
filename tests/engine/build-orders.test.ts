@@ -78,7 +78,7 @@ describe("Build Orders trên 64 dòng order mẫu", async () => {
       { ...base, RawOrderID: 2, ItemCode: "A-2", Quantity: 1, UnitPrice: 5.55, ShippingFee: 0, AdditionalCost: 0, Profit: 1.1 },
     ];
     const r = buildOrderEvents(items, loadIndex({ ...loadMasters() }));
-    expect(r.events.map((e) => [e.JournalTypeCode, e.Amount, e.rawOrderIds])).toEqual([
+    expect(r.events.map((e) => [e.JournalTypeCode, e.Amount, e.rawRowIds])).toEqual([
       ["ORD_REV_PRODUCT_FULFILLED", 25.55, [1, 2]],
       ["ORD_REV_SHIPADD_FULFILLED", 1.5, [1, 2]],
       ["ORD_SELLER_PROFIT_FULFILLED", 4.1, [1, 2]],

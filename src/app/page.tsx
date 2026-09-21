@@ -7,9 +7,13 @@ import { useState } from "react";
 import { money, postJson, useApi } from "@/components/client";
 import { StatusTag } from "@/components/ui";
 import type { BuildBatchRow, ImportBatchRow, PostingBatchRow } from "@/lib/db/schema";
+import { SOURCE_KEYS, SOURCE_META } from "@/lib/sources/columns";
 
 interface Dashboard {
   raw: Record<string, number>;
+  rawBySource: Record<string, Record<string, number>>;
+  eventsBySource: Record<string, number>;
+  glBySource: Record<string, number>;
   rawTotal: number;
   events: Record<string, number>;
   eventsTotal: number;
@@ -21,6 +25,18 @@ interface Dashboard {
 }
 
 const { Title, Paragraph, Text } = Typography;
+
+/** Orders + 4 nguồn ngoài Orders, dùng cho dãy thẻ tổng quan */
+interface SourceCard {
+  key: string;
+  href: string;
+  label: string;
+  dataSource: string;
+}
+const SOURCE_CARDS: SourceCard[] = [
+  { key: "orders", href: "/raw/orders", label: "Orders", dataSource: "ORDERS" },
+  ...SOURCE_KEYS.map((k) => ({ key: k, href: `/raw/${k}`, label: SOURCE_META[k].label, dataSource: SOURCE_META[k].dataSource })),
+];
 
 export default function DashboardPage() {
   const { message, modal } = App.useApp();
@@ -112,6 +128,38 @@ export default function DashboardPage() {
             </Button>
           </Popconfirm>
         </Space>
+      </Card>
+
+      <Card
+        title="Các nguồn dữ liệu"
+        extra={<Text type="secondary">Mỗi nguồn có trang upload riêng; Build/Post chọn nguồn ở ô &quot;Nguồn&quot;.</Text>}
+        loading={loading && !d}
+      >
+        <Row gutter={[12, 12]}>
+          {SOURCE_CARDS.map((src) => {
+            const byStatus = src.key === "orders" ? (d?.raw ?? {}) : (d?.rawBySource?.[src.key] ?? {});
+            const rawTotal = Object.values(byStatus).reduce((a, b) => a + b, 0);
+            return (
+              <Col key={src.key} xs={24} sm={12} lg={8} xl={4}>
+                <Card size="small" title={<Link href={src.href}>{src.label}</Link>}>
+                  <Statistic value={rawTotal} suffix="dòng raw" valueStyle={{ fontSize: 20 }} />
+                  <Space size={4} wrap style={{ marginTop: 6 }}>
+                    {Object.entries(byStatus).map(([k, v]) => (
+                      <Tag key={k}>
+                        {k}: {v}
+                      </Tag>
+                    ))}
+                  </Space>
+                  <div style={{ marginTop: 6 }}>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      {d?.eventsBySource?.[src.dataSource] ?? 0} event · {d?.glBySource?.[src.dataSource] ?? 0} dòng GL
+                    </Text>
+                  </div>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
       </Card>
 
       <Row gutter={[16, 16]}>

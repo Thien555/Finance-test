@@ -187,6 +187,148 @@ export const rawOrders = sqliteTable(
   (t) => [index("IX_RawOrders_Order").on(t.OrderId), index("IX_RawOrders_Fulfilled").on(t.FulfilledAt)],
 );
 
+/**
+ * Cột chung của mọi bảng raw nguồn ngân hàng/PSP (PayPal, Stripe, PIPO, AccountingSource).
+ *  - SourceKey  : khóa định danh dòng, duy nhất trong bảng (xem src/lib/<source>/normalize.ts)
+ *  - PostingDate: ngày ghi sổ đã chuẩn hóa YYYY-MM-DD, dùng để lọc theo kỳ khi Build
+ *  - ComCode    : lấy thẳng từ cột ComCode trên file (khác Orders — Orders suy ra từ PaymentGatewayName)
+ * Các cột còn lại giữ **đúng tên header của sheet**, kể cả khoảng trắng và typo "BankAccoutNumber".
+ */
+const bankRawColumns = () => ({
+  ImportBatchID: integer("ImportBatchID").notNull(),
+  SourceKey: text("SourceKey").notNull().unique(),
+  ComCode: text("ComCode"),
+  PostingDate: text("PostingDate"),
+  BuildStatus: text("BuildStatus").notNull().default("NOT_BUILT"), // NOT_BUILT | BUILT | SKIPPED | ERROR
+  BuildMessage: text("BuildMessage"),
+  RowHash: text("RowHash").notNull(),
+});
+
+export const rawPaypal = sqliteTable(
+  "RawPaypal",
+  {
+    RawPaypalID: integer("RawPaypalID").primaryKey({ autoIncrement: true }),
+    ...bankRawColumns(),
+    // ── 23 cột sheet Bank_Paypal ──
+    Date: text("Date"),
+    Time: text("Time"),
+    TimeZone: text("Time Zone"),
+    Description: text("Description"),
+    Currency: text("Currency"),
+    Gross: real("Gross"),
+    Fee: real("Fee"),
+    Net: real("Net"),
+    Balance: real("Balance"),
+    TransactionID: text("Transaction ID"),
+    FromEmailAddress: text("From Email Address"),
+    Name: text("Name"),
+    BankName: text("Bank Name"),
+    BankAccount: text("Bank account"),
+    PostageAndPackagingAmount: real("Postage and Packaging Amount"),
+    VAT: real("VAT"),
+    InvoiceID: text("Invoice ID"),
+    ReferenceTxnID: text("Reference Txn ID"),
+    JournalType: text("JournalType"),
+    StoreName: text("StoreName"),
+    PartnerCode: text("PartnerCode"),
+    BankAccoutNumber: text("BankAccoutNumber"),
+  },
+  (t) => [index("IX_RawPaypal_Posting").on(t.PostingDate), index("IX_RawPaypal_Txn").on(t.TransactionID)],
+);
+
+export const rawStripe = sqliteTable(
+  "RawStripe",
+  {
+    RawStripeID: integer("RawStripeID").primaryKey({ autoIncrement: true }),
+    ...bankRawColumns(),
+    // ── 30 cột sheet Bank_Stripe ──
+    Date: text("Date"),
+    Id: text("id"),
+    Type: text("Type"),
+    Source: text("Source"),
+    Amount: real("Amount"),
+    Fee: real("Fee"),
+    Net: real("Net"),
+    Currency: text("Currency"),
+    CreatedUtc: text("Created (UTC)"),
+    AvailableOnUtc: text("Available On (UTC)"),
+    MetaReason: text("reason (metadata)"),
+    MetaAmount: real("amount (metadata)"),
+    MetaFromOurPlatform: text("fromOurPlatform (metadata)"),
+    MetaNote: text("note (metadata)"),
+    MetaInvoiceId: text("invoiceId (metadata)"),
+    MetaStoreId: text("storeId (metadata)"),
+    MetaDomain: text("domain (metadata)"),
+    MetaDiscount: real("discount (metadata)"),
+    MetaFreeShip: text("freeShip (metadata)"),
+    MetaLink: text("link (metadata)"),
+    MetaItem: text("item (metadata)"),
+    MetaShippingFee: real("shippingFee (metadata)"),
+    MetaSubTotal: real("subTotal (metadata)"),
+    MetaTax: real("tax (metadata)"),
+    MetaStoreName: text("storeName (metadata)"),
+    JournalType: text("JournalType"),
+    StoreName: text("StoreName"),
+    PartnerCode: text("PartnerCode"),
+    BankAccoutNumber: text("BankAccoutNumber"),
+  },
+  (t) => [index("IX_RawStripe_Posting").on(t.PostingDate), index("IX_RawStripe_Id").on(t.Id)],
+);
+
+export const rawPipo = sqliteTable(
+  "RawPipo",
+  {
+    RawPipoID: integer("RawPipoID").primaryKey({ autoIncrement: true }),
+    ...bankRawColumns(),
+    // ── 17 cột sheet Bank_Pipo ──
+    Time: text("Time"),
+    Currency: text("Currency"),
+    Amount: real("Amount"),
+    TransactionId: text("TransactionId"),
+    CardNo: text("CardNo"),
+    Fee: real("Fee"),
+    Rate: real("Rate"),
+    Net: real("Net"),
+    Type: text("Type"),
+    FromTo: text("From/To"),
+    Status: text("Status"),
+    Note: text("Note"),
+    JournalType: text("JournalType"),
+    StoreName: text("StoreName"),
+    PartnerCode: text("PartnerCode"),
+    BankAccoutNumber: text("BankAccoutNumber"),
+  },
+  (t) => [index("IX_RawPipo_Posting").on(t.PostingDate), index("IX_RawPipo_Txn").on(t.TransactionId)],
+);
+
+/** Hợp của 2 sheet "Master Card" và "Bank_Royal" — cả hai đều dùng JournalType của DataSource = AccountingSource */
+export const rawAccountingSource = sqliteTable(
+  "RawAccountingSource",
+  {
+    RawAccountingSourceID: integer("RawAccountingSourceID").primaryKey({ autoIncrement: true }),
+    ...bankRawColumns(),
+    /** Tên sheet nguồn: "Master Card" | "Bank_Royal" */
+    SheetName: text("SheetName").notNull(),
+    BankAccountNumber: text("BankAccountNumber"),
+    JournalType: text("JournalType"),
+    PartnerCode: text("PartnerCode"),
+    Date: text("Date"),
+    IDTransaction: text("ID Transaction"),
+    Amount: real("Amount"),
+    Currency: text("Currency"),
+    InputCurr: text("InputCurr"),
+    Description: text("Description"),
+    BalanceImpact: text("BalanceImpact"), // Debit | Credit (chiều tiền trên sao kê)
+    RefNum: text("RefNum"),
+    Segment: text("Segment"),
+    IsPosted: text("IsPosted"),
+    BankAccount: text("BankAccount"),
+    ContraAccount: text("ContraAccount"),
+    TransAccount: text("TransAccount"),
+  },
+  (t) => [index("IX_RawAccountingSource_Posting").on(t.PostingDate), index("IX_RawAccountingSource_Sheet").on(t.SheetName)],
+);
+
 // ───────────────────────────── Engine ─────────────────────────────
 
 export const buildBatch = sqliteTable("BuildBatch", {
@@ -354,6 +496,14 @@ export type GatewayCompanyMappingRow = typeof gatewayCompanyMapping.$inferSelect
 export type ImportBatchRow = typeof importBatch.$inferSelect;
 export type RawOrderRow = typeof rawOrders.$inferSelect;
 export type RawOrderInsert = typeof rawOrders.$inferInsert;
+export type RawPaypalRow = typeof rawPaypal.$inferSelect;
+export type RawPaypalInsert = typeof rawPaypal.$inferInsert;
+export type RawStripeRow = typeof rawStripe.$inferSelect;
+export type RawStripeInsert = typeof rawStripe.$inferInsert;
+export type RawPipoRow = typeof rawPipo.$inferSelect;
+export type RawPipoInsert = typeof rawPipo.$inferInsert;
+export type RawAccountingSourceRow = typeof rawAccountingSource.$inferSelect;
+export type RawAccountingSourceInsert = typeof rawAccountingSource.$inferInsert;
 export type BuildBatchRow = typeof buildBatch.$inferSelect;
 export type AccountingEventRow = typeof accountingEvent.$inferSelect;
 export type AccountingEventInsert = typeof accountingEvent.$inferInsert;

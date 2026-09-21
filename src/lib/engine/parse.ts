@@ -108,6 +108,24 @@ export function parseDateTime(v: unknown): string | null {
   return d ? d.format("YYYY-MM-DD HH:mm:ss") : null;
 }
 
+/**
+ * Ô chỉ chứa giờ trong ngày → "HH:mm:ss".
+ * .xlsx lưu kiểu này thành Date năm 1899 (exceljs) hoặc số thập phân phần của ngày (0.2295 = 05:30:40).
+ */
+export function parseTimeOfDay(v: unknown): string | null {
+  if (isBlank(v)) return null;
+  if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : formatDateTime(v).slice(-8);
+  if (typeof v === "number" && v >= 0 && v < 1) {
+    const total = Math.round(v * 86400);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(Math.floor(total / 3600) % 24)}:${pad(Math.floor(total / 60) % 60)}:${pad(total % 60)}`;
+  }
+  const s = String(v).trim();
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(s);
+  if (m) return `${m[1].padStart(2, "0")}:${m[2]}:${m[3] ?? "00"}`;
+  return s || null;
+}
+
 export function formatDateTime(d: Date): string {
   const x = fromExcelDate(d);
   if (d.getUTCFullYear() < 1900) return x.format("HH:mm:ss"); // ô chỉ có giờ

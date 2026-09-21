@@ -30,18 +30,32 @@ export type PartnerRule = { mode: "FIXED"; code: string } | { mode: "FROM_SOURCE
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
 
+/**
+ * Chuẩn hóa số tài khoản ngân hàng để tra MappingBankAccount.
+ * Sheet Bank_Royal ghi "076621019512" còn master ghi "76621019512" → bỏ số 0 đứng đầu.
+ * Cũng bỏ khoảng trắng và dấu gạch hay gặp trong export ngân hàng.
+ */
+export const normBankAccount = (s: string | null | undefined) =>
+  norm(s).replace(/[\s-]/g, "").replace(/^0+(?=\d)/, "");
+
 export class MasterIndex {
   private jtByKey = new Map<string, JournalTypeRow>();
+  private jtByNativeType = new Map<string, JournalTypeRow>();
   private rulesByJtc = new Map<string, JournalLineRuleRow[]>();
   private partnersByCode = new Map<string, PartnerRow[]>();
   private partnersByTaxId = new Map<string, PartnerRow[]>();
   private companyByCode = new Map<string, CompanyRow>();
   private comCodeByGateway = new Map<string, string>();
+  private bankByAccount = new Map<string, MappingBankAccountRow>();
   private accountCodes = new Set<string>();
 
   constructor(public readonly masters: Masters) {
     for (const jt of masters.journalTypes) {
       this.jtByKey.set(`${norm(jt.DataSource)}|${norm(jt.JournalTypeCode)}`, jt);
+      // Tra theo loại giao dịch gốc của nguồn (PayPal dùng Type/Description, Stripe dùng TransType).
+      // Dòng khai báo trước thắng để thứ tự sheet quyết định khi 2 JournalTypeCode cùng tên gốc.
+      const nativeKey = `${norm(jt.DataSource)}|${norm(jt.JournalType)}`;
+      if (jt.JournalType && !this.jtByNativeType.has(nativeKey)) this.jtByNativeType.set(nativeKey, jt);
     }
     for (const r of masters.lineRules) {
       if (!r.IsActive) continue;
@@ -62,10 +76,25 @@ export class MasterIndex {
       if (g.IsActive) this.comCodeByGateway.set(norm(g.PaymentGatewayName), g.ComCode.trim().toUpperCase());
     }
     for (const a of masters.coa) this.accountCodes.add(a.AccountCode.trim());
+    for (const b of masters.bankMappings) {
+      if (b.IsActive) this.bankByAccount.set(`${norm(b.ComCode)}|${normBankAccount(b.BankAccountNumber)}`, b);
+    }
   }
 
   journalType(dataSource: string, journalTypeCode: string): JournalTypeRow | undefined {
     return this.jtByKey.get(`${norm(dataSource)}|${norm(journalTypeCode)}`);
+  }
+
+  /** Tra JournalType theo loại giao dịch gốc trên file (JournalType.JournalType), dùng khi cột JournalType điền tay bị trống */
+  journalTypeByNativeType(dataSource: string, nativeType: string | null | undefined): JournalTypeRow | undefined {
+    if (!nativeType?.trim()) return undefined;
+    return this.jtByNativeType.get(`${norm(dataSource)}|${norm(nativeType)}`);
+  }
+
+  /** MappingBankAccount theo ComCode + số tài khoản → { GLAccountCode, InputCurr } */
+  bankMapping(comCode: string | null | undefined, bankAccountNumber: string | null | undefined): MappingBankAccountRow | undefined {
+    if (!bankAccountNumber?.trim()) return undefined;
+    return this.bankByAccount.get(`${norm(comCode)}|${normBankAccount(bankAccountNumber)}`);
   }
 
   activeRules(journalTypeCode: string): JournalLineRuleRow[] {

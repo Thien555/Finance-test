@@ -10,7 +10,9 @@ import { getDb } from "@/lib/db/client";
 import { accountingEvent, exceptionLog, glTrans, postingBatch, rawOrders } from "@/lib/db/schema";
 import { ORDERS_DATA_SOURCE } from "@/lib/engine/build-orders";
 import { nowIso } from "@/lib/engine/parse";
-import { chunk, periodOfDateColumn, type Scope, scopeWhere } from "./common";
+import type { SourceKey } from "@/lib/sources/columns";
+import { countBuiltSourceRows, resetSourceRawStatus, SOURCE_DATA_SOURCES } from "./build-source";
+import { chunk, deleteExceptionsByDataSource, periodOfDateColumn, type Scope, scopeWhere } from "./common";
 
 export interface UnpostResult {
   preview: boolean;
@@ -90,6 +92,12 @@ function unbuildSteps(options: UnbuildOptions): UnbuildResult {
   const scope = options.scope ?? {};
 
   const unposted = options.includePosted ? unpost({ scope, preview: options.preview }) : null;
+
+  // Nguồn ngân hàng/PSP: 1 dòng raw ⇄ 1 bộ event nên không cần guard theo item như Orders —
+  // xóa event chưa post trong phạm vi rồi reset BuildStatus của đúng bảng raw đó.
+  const bankSource = sourceKeyOfDataSource(scope.dataSource);
+  if (bankSource) return unbuildBankSource(db, bankSource, scope, options, unposted);
+
   // Preview của "Unpost + Unbuild": event POSTED trong scope coi như sẽ được unpost trước
   const simulateUnpost = !!options.preview && !!unposted;
 
@@ -149,10 +157,60 @@ function unbuildSteps(options: UnbuildOptions): UnbuildResult {
   return result;
 }
 
+/** Nguồn ngân hàng/PSP theo AccountingEvent.DataSource; null nếu là Orders hoặc không giới hạn nguồn */
+function sourceKeyOfDataSource(dataSource: string | null | undefined): SourceKey | null {
+  if (!dataSource) return null;
+  const want = dataSource.trim().toUpperCase();
+  const hit = (Object.entries(SOURCE_DATA_SOURCES) as [SourceKey, string][]).find(([, ds]) => ds.toUpperCase() === want);
+  return hit ? hit[0] : null;
+}
+
+function unbuildBankSource(
+  db: ReturnType<typeof getDb>,
+  source: SourceKey,
+  scope: Scope,
+  options: UnbuildOptions,
+  unposted: UnpostResult | null,
+): UnbuildResult {
+  const eventScope = scopeWhere(accountingEvent, scope);
+  const countEvents = (...extra: SQL[]) => db.select({ n: count() }).from(accountingEvent).where(and(...eventScope, ...extra)).all()[0].n;
+  const deletable = countEvents(ne(accountingEvent.PostStatus, "POSTED"));
+  const postedInScope = countEvents(eq(accountingEvent.PostStatus, "POSTED"));
+  const simulateUnpost = !!options.preview && !!unposted;
+
+  const result: UnbuildResult = {
+    preview: !!options.preview,
+    unposted,
+    deletedEvents: simulateUnpost ? deletable + postedInScope : deletable,
+    postedEventsKept: simulateUnpost ? 0 : postedInScope,
+    rawRowsReset: countBuiltSourceRows(db, source, scope),
+  };
+  if (options.preview) return result;
+
+  db.transaction((tx) => {
+    tx.delete(accountingEvent).where(and(...eventScope, ne(accountingEvent.PostStatus, "POSTED"))).run();
+    resetSourceRawStatus(tx, source, scope);
+    deleteExceptionsByDataSource(tx, "BUILD", SOURCE_DATA_SOURCES[source], scope);
+  });
+  return result;
+}
+
 /** Xóa toàn bộ dữ liệu test (giữ master data) */
 export function resetTransactionalData() {
   const sqlite = getDb().$client;
-  const tables = ["GLTrans", "AccountingEvent", "PostingBatch", "BuildBatch", "ExceptionLog", "RawOrders", "ImportBatch"];
+  const tables = [
+    "GLTrans",
+    "AccountingEvent",
+    "PostingBatch",
+    "BuildBatch",
+    "ExceptionLog",
+    "RawOrders",
+    "RawPaypal",
+    "RawStripe",
+    "RawPipo",
+    "RawAccountingSource",
+    "ImportBatch",
+  ];
   sqlite.transaction(() => {
     for (const t of tables) sqlite.prepare(`DELETE FROM "${t}"`).run();
     const placeholders = tables.map(() => "?").join(",");

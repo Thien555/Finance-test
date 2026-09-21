@@ -63,8 +63,8 @@ export default function EventsPage() {
             items={[
               { label: "Phạm vi", children: r.scope },
               { label: "Dòng raw đọc", children: r.SourceRows },
-              { label: "Dòng FULFILLED được build", children: r.FulfilledRows },
-              { label: "Dòng bỏ qua (chưa fulfill)", children: r.SkippedRows },
+              { label: "Dòng đủ điều kiện build", children: r.FulfilledRows },
+              { label: "Dòng bị bỏ qua (chưa fulfill / bị lọc)", children: r.SkippedRows },
               { label: "Dòng lỗi mapping", children: r.ErrorRows },
               { label: "Event tạo mới", children: r.EventsCreated },
               { label: "Event thay thế (chưa post)", children: r.EventsReplaced },
@@ -126,8 +126,9 @@ export default function EventsPage() {
           2. AccountingEvent
         </Typography.Title>
         <Typography.Text type="secondary">
-          Build chuyển raw order thành event chuẩn hóa (chưa tách Nợ/Có, chưa ghi sổ). Mỗi order fulfilled → tối đa 4 event: PRODUCT, SHIPADD, TAX,
-          SELLER_PROFIT. Bấm 1 dòng để xem chi tiết & truy vết.
+          Build chuyển dòng raw thành event chuẩn hóa (chưa tách Nợ/Có, chưa ghi sổ). Orders: mỗi đơn fulfilled → tối đa 4 event (PRODUCT, SHIPADD,
+          TAX, SELLER_PROFIT). PayPal/Stripe/PIPO/AccountingSource: mỗi dòng raw → 1 event cho mỗi JournalLineRule active. Chọn nguồn ở ô
+          &quot;Nguồn&quot; rồi bấm Build; để trống là Orders. Bấm 1 dòng để xem chi tiết &amp; truy vết.
         </Typography.Text>
       </div>
 
@@ -135,7 +136,7 @@ export default function EventsPage() {
         <Space wrap>
           <ScopeBar value={scope} onChange={setScope} options={options} />
           <Button type="primary" icon={<BuildOutlined />} loading={busy === "build"} onClick={build}>
-            Build Orders
+            Build {scope.dataSource ?? "ORDERS"}
           </Button>
           <Button icon={<RollbackOutlined />} loading={busy === "unbuild"} onClick={() => unbuildFlow(false)}>
             Unbuild

@@ -221,3 +221,4 @@ CoAID,AccountCode,AccountName,AccountType,BalanceSide,Status,AddDate,ModifiedDat
 220,82120001,Chi phí thuế TNDN hoãn lại,Exp,Dr,Active,48:55.8,48:55.8,NULL,NULL
 221,64202014,Chi phí QLDN - Stripe transaction fee,Exp,Dr,Active,55:37.5,55:37.5,NULL,NULL
 222,64202015,Chi phí QLDN - Stripe standalone fee,Exp,Dr,Active,55:37.5,55:37.5,NULL,NULL
+223,11202091,MasterCard - Available (USD),A,Dr,Active,NULL,NULL,NULL,NULL

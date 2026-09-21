@@ -55,6 +55,18 @@ export function insertExceptions(db: DbOrTx, batchType: "IMPORT" | "BUILD" | "PO
   }
 }
 
+/**
+ * Xóa exception của 1 nguồn theo phạm vi. Dùng cho các nguồn ngân hàng/PSP: exception của chúng được gom
+ * nhóm (Period = null) nên không xóa được bằng khóa/kỳ như Orders.
+ */
+export function deleteExceptionsByDataSource(db: DbOrTx, batchType: "BUILD" | "POST", dataSource: string, scope: Scope) {
+  const where: SQL[] = [eq(exceptionLog.BatchType, batchType), eq(exceptionLog.DataSource, dataSource)];
+  if (scope.comCode) where.push(eq(exceptionLog.ComCode, scope.comCode));
+  db.delete(exceptionLog)
+    .where(and(...where))
+    .run();
+}
+
 export function deleteExceptionsByKeys(db: DbOrTx, batchType: "BUILD" | "POST", keys: string[]) {
   for (const c of chunk([...new Set(keys)], 500)) {
     db.delete(exceptionLog)

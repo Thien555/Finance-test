@@ -53,9 +53,10 @@ Web kế toán cho công ty dropshipping: nhận **file order thô** → chuẩn
 - Unpost, Unbuild, Unpost + Unbuild (có preview), Run cycle, Reset dữ liệu test.
 - Exceptions log, Dashboard, Master data (xem 6 bảng, sync Google Sheet, CRUD Company & GatewayCompanyMapping).
 - Engine Post đã tổng quát theo JournalType/JournalLineRule (SIGNED/REVERSE/ERROR, FIXED partner, FX MUL/DIV) → dùng lại được cho nguồn khác.
+- **4 nguồn ngoài Orders** end-to-end (§6.11): PayPal, Stripe, PIPO, AccountingSource (2 sheet nhập tay Master Card + Bank_Royal) — Import theo sheet → Build → Post → Unpost/Unbuild theo nguồn.
 
 ### 1.2 Chưa làm (theo `tai lieu du an.md`)
-Auth/phân quyền (§20), Company tree & Accounting Period lock (§4), nguồn PayPal/PIPO/Stripe/AccountingSource (§7.2, §7.4–7.6), Manual Entry (§6), ExchangeRateResolveRule dạng Daily (§11 – hiện chỉ theo kỳ), PartnerSourceMapping riêng, Operation Audit Log, dashboard nâng cao.
+Auth/phân quyền (§20), Company tree & Accounting Period lock (§4), Manual Entry (§6), ExchangeRateResolveRule dạng Daily (§11 – hiện chỉ theo kỳ), PartnerSourceMapping riêng, Operation Audit Log, dashboard nâng cao.
 
 ### 1.3 Tech stack
 
@@ -116,6 +117,8 @@ docs/DEVELOPER_GUIDE.md           File này
 data/
   seed/*.csv                      Snapshot 6 sheet master (seed DB)
   samples/orders-sample.csv|.xlsx File order mẫu 64 dòng (dùng cho test + nút "Import file mẫu")
+  samples/paypal|stripe|pipo|master-card|bank-royal-sample.csv
+                                  Mẫu trích từ Data-khac-order.xlsx cho test 4 nguồn ngoài Orders
   samples/*-reference.csv         Mẫu GlTrans/AccountingEvent/PostingBatch từ hệ thống cũ để đối chiếu format
   finance.db                      SQLite (gitignore, tự tạo)
 drizzle/                          Migration SQL (0000_init.sql) + meta
@@ -126,12 +129,13 @@ src/
     globals.css
     page.tsx                      Dashboard
     raw/orders/page.tsx           1. Raw Orders
+    raw/[source]/page.tsx         1b-1e. Raw PayPal / Stripe / PIPO / AccountingSource (1 trang động)
     events/page.tsx               2. AccountingEvent
     posting/page.tsx              3. Posting
     gl/page.tsx                   4. GLTrans
     exceptions/page.tsx           Exceptions
     master/page.tsx               Master data
-    api/**/route.ts               26 route handler (§7)
+    api/**/route.ts               28 route handler (§7)
   components/
     AppShell.tsx                  Layout + menu + ConfigProvider vi_VN
     client.ts                     useApi, getJson/postJson/deleteJson, toQuery, useOptions, money
@@ -142,16 +146,18 @@ src/
     field-docs.ts                 Giải thích cột GLTrans/AccountingEvent/PostingBatch (tooltip) – client-safe
     gl-columns.ts                 Thứ tự cột GLTrans/AccountingEvent – client-safe
     gl-filter.ts                  URLSearchParams → GlFilter
-    db/schema.ts                  Drizzle schema 15 bảng + type
+    db/schema.ts                  Drizzle schema 19 bảng + type
     db/client.ts                  getDb() (migrate + seed lần đầu), closeDb, DB_FILE
     db/seed.ts                    replaceMasters, seedMastersIfEmpty, seedDefaults, readSnapshotTexts
     engine/
       parse.ts                    parseNumber, parseDate, parseDateTime, toText, toFlag, isBlank, nowIso
       keys.ts                     ymd, periodOf, orderTransactionId, orderSourceId, singleDocNum, bulkDocNum, postingGroupKey, eventKey, sha256
       masters.ts                  Masters, MasterIndex, parsePartnerRule, accountFromSource
-      resolve-partner.ts          resolveFixedPartner, resolveSeller
+      resolve-partner.ts          resolveFixedPartner, resolveSeller, resolvePartnerByCode
       resolve-fx.ts               resolveFx, applyFx
       build-orders.ts             buildOrderEvents, orderRowsInScope + hằng ORDER_JOURNAL_TYPE_CODES
+      build-bank.ts               buildBankEvents, BankSourceSpec, amountFromSource — engine chung 4 nguồn ngoài Orders (§6.11)
+      sources/*.ts                Khai báo từng nguồn paypal/stripe/pipo/accounting-source (đọc cột nào, lọc gì, tiền ở đâu)
       reconcile-events.ts         reconcileEvents (đối chiếu draft với event trong DB → insert/replace/xóa/chặn ghi sổ trùng)
       post.ts                     classifyOf, expandEvent, postEvents, assertBalanced
       post-guard.ts               findDuplicateItems (chốt chặn lúc Post: item đã/đang ghi sổ dưới khóa khác)
@@ -161,17 +167,22 @@ src/
     master/parse-master.ts        Parse CSV 6 bảng master
     orders/columns.ts             46 cột file order – client-safe
     orders/normalize.ts           canonicalHeaders, normalizeOrderRow
+    sources/columns.ts            Cột 5 sheet ngoài Orders, SOURCE_META, SHEET_COLUMNS, canonicalHeaderMap – client-safe
+    sources/normalize.ts          normalize{Paypal,Stripe,Pipo,AccountingSource}Row, signedAmount
+    sources/route-params.ts       parseSourceKey (tham số [source] sai → 400)
     services/
-      common.ts                   Scope, loadMasterIndex, scopeWhere, chunk, insertExceptions, deleteExceptionsByKeys
+      common.ts                   Scope, loadMasterIndex, scopeWhere, chunk, insertExceptions, deleteExceptionsByKeys, deleteExceptionsByDataSource
       import-orders.ts            importOrders
+      import-source.ts            importSourceFile (chung cho 4 nguồn, chọn sheet)
       build.ts                    runBuildOrders
+      build-source.ts             runBuildSource, SOURCE_DATA_SOURCES, resetSourceRawStatus, countBuiltSourceRows
       post.ts                     runPost
       clear.ts                    unpost, unbuild, resetTransactionalData
       queries.ts                  list*/detail/dashboard/options/listMaster
       export.ts                   glWorkbook, eventsWorkbook
       master.ts                   syncMastersFromGoogleSheet, upsertGatewayMapping, deleteGatewayMapping, upsertCompany
 tests/
-  helpers/fixtures.ts             loadMasters, loadIndex, loadSampleOrders, toEventRows
+  helpers/fixtures.ts             loadMasters, loadIndex, loadSampleOrders, loadSample{Paypal,Stripe,Pipo,AccountingSource}, toEventRows
   engine/parse.test.ts
   engine/build-orders.test.ts
   engine/post.test.ts
@@ -179,11 +190,13 @@ tests/
   engine/post-guard.test.ts       Chốt chặn ghi sổ trùng lúc Post
   integration/flow.test.ts        Cả luồng trên DB tạm
   integration/gateway-remap.test.ts Đổi GatewayCompanyMapping sau khi post → chặn → Unpost → Build → Post
+  engine/build-bank.test.ts       4 nguồn ngoài Orders: map JournalType, resolve tài khoản 3 tầng, dấu tiền, FX CAD
+  integration/bank-sources.test.ts Import 5 sheet → Build → Post → Unpost/Unbuild theo nguồn
   integration/posted-guards.test.ts Đơn 2 cổng đổi 1 cổng; import lại đổi ngày giao sau khi gỡ mapping
 ```
 
 ### 2.3 Quy tắc import (quan trọng)
-- **Page client không được import** module kéo theo `node:crypto`, `node:fs`, `exceljs`, `better-sqlite3` (ví dụ `engine/keys.ts`, `orders/normalize.ts`, `services/*` trừ `import type`). Nếu cần hằng số dùng chung, đặt trong file client-safe: `src/lib/orders/columns.ts`, `src/lib/gl-columns.ts`, `src/lib/field-docs.ts`.
+- **Page client không được import** module kéo theo `node:crypto`, `node:fs`, `exceljs`, `better-sqlite3` (ví dụ `engine/keys.ts`, `orders/normalize.ts`, `sources/normalize.ts`, `services/*` trừ `import type`). Nếu cần hằng số dùng chung, đặt trong file client-safe: `src/lib/orders/columns.ts`, `src/lib/sources/columns.ts`, `src/lib/gl-columns.ts`, `src/lib/field-docs.ts`.
 - Từ page chỉ `import type { ... } from "@/lib/services/..."` hoặc `@/lib/db/schema` (chỉ type).
 - Engine không import `db/client` hay `services`.
 
@@ -253,7 +266,7 @@ File `src/lib/db/schema.ts`. **Tên bảng/cột PascalCase giữ đúng như sh
 | `JournalLineRule` | `JournalLineRuleID` | `JournalTypeCode`, `RuleSeq`, `PairCode`, `NormalDrAccountSource`, `NormalCrAccountSource`, `AmountSource`, `AmountFactor`, `ReverseIfNegative`, `SkipIfDrAccountNull`, `SkipIfCrAccountNull`, `SkipIfAmountZero`, `PartnerMode`, `FixedPartner`, `ApplyPartnerToDrLine`, `ApplyPartnerToCrLine`, `MemoTemplate`, `IsActive`, `NegativeMode` |
 | `CoA` | `CoAID` | `AccountCode`, `AccountName`, `AccountType`, `BalanceSide`, `Status`, `ARAP`, `ARAPType` |
 | `Exrate` | `ExrateID` | `Period`, `ExrateDate`, `ReportCurrency` (= FncCurr), `TransCurrency` (= InputCurr), `RateType` (MUL/DIV), `Exrate`, `IsActive` |
-| `MappingBankAccount` | `ID` auto | `ComCode`, `BankAccountNumber`, `InputCurr`, `GLAccountCode`, `BankName`, `IsActive` (Orders chưa dùng) |
+| `MappingBankAccount` | `ID` auto | `ComCode`, `BankAccountNumber`, `InputCurr`, `GLAccountCode`, `BankName`, `IsActive`. Orders không dùng; 4 nguồn còn lại dùng để resolve tài khoản ngân hàng/PSP (§6.11) |
 | `Company` | `ComCode` | `CompanyName`, `FunctionalCurrency` (= FncCurr), `IsActive`. **Không có trong sheet** |
 | `GatewayCompanyMapping` | `ID` auto, unique `PaymentGatewayName` | Map cột `PaymentGatewayName` của order → `ComCode`. **Không có trong sheet** |
 
@@ -263,6 +276,13 @@ File `src/lib/db/schema.ts`. **Tên bảng/cột PascalCase giữ đúng như sh
 |---|---|---|
 | `ImportBatch` | `ImportBatchID` | `DataSource`, `FileName`, `UploadedAt`, `Status`, `TotalRows`, `SuccessRows`, `ErrorRows`, `SkippedRows`, `ErrorMessage`, `ErrorDetails` (JSON `[{row,key,message}]`, tối đa 500) |
 | `RawOrders` | `RawOrderID`, **unique `ItemCode`** | `ImportBatchID`, `ComCode` (resolve lúc import và build), `BuildStatus`, `BuildMessage`, `RowHash` + 46 cột file order (xem `src/lib/orders/columns.ts`). Index `OrderId`, `FulfilledAt` |
+| `RawPaypal` | `RawPaypalID`, **unique `SourceKey`** | Cột quản trị chung (`ImportBatchID`, `SourceKey`, `ComCode`, `PostingDate`, `BuildStatus`, `BuildMessage`, `RowHash`) + 23 cột sheet `Bank_Paypal`. Index `PostingDate`, `Transaction ID` |
+| `RawStripe` | `RawStripeID`, **unique `SourceKey`** | Cột quản trị chung + 30 cột sheet `Bank_Stripe`. Index `PostingDate`, `id` |
+| `RawPipo` | `RawPipoID`, **unique `SourceKey`** | Cột quản trị chung + 17 cột sheet `Bank_Pipo`. Index `PostingDate`, `TransactionId` |
+| `RawAccountingSource` | `RawAccountingSourceID`, **unique `SourceKey`** | Cột quản trị chung + `SheetName` + hợp các cột của 2 sheet `Master Card` và `Bank_Royal`. Index `PostingDate`, `SheetName` |
+
+> Tên cột của 4 bảng raw mới giữ **đúng header sheet**, kể cả khoảng trắng (`Transaction ID`, `Time Zone`, `invoiceId (metadata)`) và typo `BankAccoutNumber`. Trong TypeScript chúng có tên thuộc tính gọn hơn (`TransactionID`, `TimeZone`, `MetaInvoiceId`) — xem `src/lib/db/schema.ts`.
+> `ComCode` của các bảng này lấy **thẳng từ cột ComCode trên file** (khác Orders — Orders suy từ `PaymentGatewayName`).
 
 **Engine**
 
@@ -282,7 +302,8 @@ Không có foreign key; liên kết qua giá trị:
 | `GLTrans.PostingGroupKey` | `AccountingEvent.PostingGroupKey` | Chỉ Bulk; Single để null |
 | `GLTrans.ReferenceTxnID` | `AccountingEvent.TransactionID` | Chỉ Single; Bulk để null |
 | `AccountingEvent.OrderID` + `PostingDate` | `RawOrders.OrderId` + `FulfilledAt` | Cách join thực tế ở `eventDetail`/`glDocumentDetail` |
-| `AccountingEvent.ItemCodes` (JSON) | `RawOrders.ItemCode` (unique) | **n-n**, liên kết event → dòng raw duy nhất được vật chất hóa; truy vấn bằng `json_each` |
+| `AccountingEvent.ItemCodes` (JSON) | `RawOrders.ItemCode` (unique) | **n-n**, liên kết event → dòng raw duy nhất được vật chất hóa; truy vấn bằng `json_each`. Chỉ Orders dùng; 4 nguồn kia để null |
+| `AccountingEvent.SourceID` = `{DataSource}\|{SourceKey}` | `RawPaypal/RawStripe/RawPipo/RawAccountingSource.SourceKey` | Liên kết event → dòng raw của các nguồn ngoài Orders (1 dòng raw ⇄ 1 bộ event) |
 | `RawOrders.ImportBatchID` | `ImportBatch.ImportBatchID` | |
 | `AccountingEvent.BuildBatchID` / `PostBatchID` | `BuildBatch` / `PostingBatch` | `PostBatchID` về null khi Unpost |
 | `GLTrans.PostBatchID` | `PostingBatch.PostBatchID` | notNull |
@@ -533,7 +554,9 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
    Nhờ vậy dòng có item còn trong event (VD Unbuild ComCode mới sau khi đổi mapping, event chưa post của ComCode cũ vẫn còn) vẫn `BUILT`, import không thay được dòng đó.
 4. Xóa `ExceptionLog` BatchType BUILD khớp `ComCode = scope` / `Period` trong scope (không scope → xóa hết BUILD). Có scope thì exception có ComCode/Period null (VD `MISSING_COMCODE`, lỗi cấu hình) **không bị xóa**; exception POST của event bị xóa **không bị dọn** (mồ côi).
 
-**`resetTransactionalData()`** – `POST /api/reset`: xóa `GLTrans, AccountingEvent, PostingBatch, BuildBatch, ExceptionLog, RawOrders, ImportBatch` + reset `sqlite_sequence` (ID bắt đầu lại từ 1). Master giữ nguyên.
+**Unbuild nguồn ngoài Orders:** khi `scope.dataSource` là `PAYPAL`/`STRIPE`/`PIPO`/`ACCOUNTINGSOURCE`, `unbuild` đi nhánh riêng (`unbuildBankSource`) vì các nguồn này không dùng `ItemCodes`: xóa event chưa POSTED trong scope → reset `BuildStatus` của đúng bảng raw đó theo cùng phạm vi → xóa exception BUILD theo `DataSource` (+ ComCode). Không đụng tới Orders hay các nguồn khác.
+
+**`resetTransactionalData()`** – `POST /api/reset`: xóa `GLTrans, AccountingEvent, PostingBatch, BuildBatch, ExceptionLog, RawOrders, RawPaypal, RawStripe, RawPipo, RawAccountingSource, ImportBatch` + reset `sqlite_sequence` (ID bắt đầu lại từ 1). Master giữ nguyên.
 
 **UI:** trang `/events` và `/posting` gọi API với `preview: true` trước, hiển thị `modal.confirm` kèm số lượng, bấm OK mới chạy thật.
 
@@ -601,6 +624,122 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
 ---
 
+### 6.11 Build các nguồn ngoài Orders (PayPal / Stripe / PIPO / AccountingSource)
+
+Tài liệu gốc: §7.2 AccountingSource, §7.4 PayPal, §7.5 PIPO, §7.6 Stripe. Dữ liệu thật: `docs/tai-lieu-goc-and-data/Data-khac-order.xlsx` (5 sheet).
+
+**Post không phải sửa gì** — 4 nguồn này chỉ thêm tầng Import + Build.
+
+#### 6.11.1 Bản đồ nguồn → sheet → bảng
+
+| `source` (URL/API) | `DataSource` (trên event) | Sheet | Bảng raw | Dòng thật |
+|---|---|---|---|---|
+| `paypal` | `PAYPAL` | `Bank_Paypal` | `RawPaypal` | 142.659 |
+| `stripe` | `STRIPE` | `Bank_Stripe` | `RawStripe` | 1.413 |
+| `pipo` | `PIPO` | `Bank_Pipo` | `RawPipo` | 952 |
+| `accounting-source` | `ACCOUNTINGSOURCE` | `Master Card` + `Bank_Royal` | `RawAccountingSource` | 39 + 31 |
+
+`ACCOUNTINGSOURCE` viết liền và viết HOA để khớp `norm("AccountingSource")` khi tra `JournalType`, và để khớp `scopeWhere` (hàm này uppercase `dataSource`).
+
+#### 6.11.2 Khác Orders ở đâu
+
+| | Orders | 4 nguồn này |
+|---|---|---|
+| Khóa dòng raw | `ItemCode` | `SourceKey` (§6.11.3) |
+| ComCode | suy từ `PaymentGatewayName` | lấy thẳng cột `ComCode` trên file |
+| JournalType | cố định 4 mã | **cột `JournalType` người dùng điền tay**; trống thì suy từ loại giao dịch gốc |
+| Gom nhóm | nhiều dòng raw → 1 event | **1 dòng raw → 1 event cho mỗi rule active** |
+| `ItemCodes` / post-guard | có | không (xem §6.11.6) |
+| Exception | ghi từng dòng | **gom nhóm + đếm** (§6.11.7) |
+
+#### 6.11.3 SourceKey — khóa định danh dòng
+
+Quy tắc bắt buộc: **không được phụ thuộc các cột người dùng điền tay** (`JournalType`, `PartnerCode`, `StoreName`, các cột tài khoản). Nhờ vậy sửa tay rồi import lại sẽ đổi `RowHash` nhưng giữ nguyên `SourceKey`, nên tầng Import nhận ra đúng dòng cũ và chặn được.
+
+| Nguồn | `SourceKey` | Vì sao |
+|---|---|---|
+| PayPal | `{Transaction ID}` + `{Date}` + `{Time}` | `Transaction ID` đơn lẻ **có 37 mã trùng** (tối đa 3 lần, kiểu Hold → Cancel Hold dùng chung mã). Bộ 3 là duy nhất trên cả 142.659 dòng |
+| Stripe | `id` | duy nhất tuyệt đối |
+| PIPO | `TransactionId` | duy nhất tuyệt đối |
+| Master Card | `MC` + `{ID Transaction}` | duy nhất tuyệt đối |
+| Bank_Royal | `RB` + `{sha256(nhận dạng dòng)}#{lần xuất hiện}` | **`RefNum` trống 31/31 dòng**, và có 1 cặp dòng trùng y hệt (2 lần trả lương 266.25 cùng ngày). Hash chỉ gồm `SheetName, Comcode, BankAccountNumber, Date, Amount, InputCurr, PartnerCode` |
+
+`AccountingEvent.TransactionID` vẫn là **mã giao dịch gốc** (để `ReferenceTxnID` và đuôi `Description` khớp sheet mẫu GLTrans); Bank_Royal không có mã nên dùng luôn `SourceKey`. `SourceID` = `{DataSource}` + `{SourceKey}`.
+
+#### 6.11.4 Engine
+
+- `src/lib/engine/build-bank.ts` — engine chung, chứa toàn bộ quy tắc kế toán.
+- `src/lib/engine/sources/{paypal,stripe,pipo,accounting-source}.ts` — `BankSourceSpec`, thuần khai báo: đọc cột nào, lọc dòng nào, số tiền lấy ở đâu.
+
+Trình tự mỗi dòng:
+
+1. **`accept`** — lọc theo điều kiện nguồn. PayPal/Stripe chỉ `Currency = USD`; PIPO chỉ `Status = Success`. Dòng bị loại → `SKIPPED` + exception INFO `SOURCE_ROW_SKIPPED`.
+2. **ComCode → Company** — thiếu → `MISSING_COMCODE` / `MISSING_COMPANY`.
+3. **PostingDate** — đọc không ra → `INVALID_SOURCE_ROW`.
+4. **JournalType** — cột điền tay thắng (`index.journalType(dataSource, code)`); trống thì `index.journalTypeByNativeType(dataSource, nativeType)` so với cột `JournalType.JournalType` của master. Không ra → `MISSING_JOURNAL_TYPE`.
+5. **Tài khoản**, đúng thứ tự §7.2 bước 3: **giá trị trên dòng nguồn → MappingBankAccount (`ComCode` + số tài khoản) → mặc định của JournalType**.
+6. **Partner** theo `JournalType.Partner`: `Fixed = X` → `resolveFixedPartner`; `From Source` → `resolvePartnerByCode` (tra `Partners.PartnerCode`, 1 email nhiều store thì lọc tiếp bằng `StoreName`). Không tìm thấy → vẫn ghi sổ với mã đó, `PartnerTaxID` trống + cảnh báo `MISSING_PARTNER`.
+7. **Mỗi JournalLineRule active → 1 event**, `EventSeq = RuleSeq`, `Amount` theo `AmountSource` (`AMOUNT` / `GROSS` / `FEE` / `NET`) — **giữ nguyên dấu, chưa nhân `AmountFactor`** (Post mới nhân).
+
+`MasterIndex` được bổ sung 2 lookup: `journalTypeByNativeType(dataSource, nativeType)` và `bankMapping(comCode, bankAccountNumber)`. Hàm sau chuẩn hóa **bỏ số 0 đứng đầu** vì `Bank_Royal` ghi `076621019512` còn master ghi `76621019512`.
+
+#### 6.11.5 Riêng từng nguồn
+
+**PayPal (§7.4)**
+- `Description` ↔ `JournalType` trong file là **1:1 tuyệt đối** (22 loại) nên fallback luôn ra đúng.
+- `Fee` mang dấu **âm**; rule pair 3 (`FEE_BANK`) có `AmountFactor = -1` nên đảo lại thành dương.
+- `BankAccoutNumber` trống 100% → mặc định `PAYPAL1` (MappingBankAccount → `11202051`).
+- `OrderID` = `Invoice ID`, `RefNum` = `Reference Txn ID`.
+
+**Stripe (§7.6)**
+- `Currency` trong file là `usd` **chữ thường** → normalizer uppercase; nếu không, bộ lọc USD sẽ loại sạch 100% dòng.
+- `Fee` mang dấu **dương** (ngược PayPal), `AmountFactor = 1`.
+- Mặc định `Stripe1` → `11202081`.
+- Master được bổ sung 2 JournalType: `STRIPE_RECEIPT_CUSTOMER` (khớp mã người dùng điền cho `charge`) và `STRIPE_RESERVE` (`JournalType = reserved_funds`, Contra `11202082`) để 70 dòng `reserved_funds` bỏ trống cột JournalType tự map được.
+
+**PIPO (§7.5)**
+- `Amount`, `Fee`, `Net` là **text có đuôi tiền tệ** (`"1.01USD"`, `"100.00USD"`) → `parseNumber` bóc phần số. 868/952 dòng có phí.
+- §7.5 bước 5: với `BANK_PAYMENT_%` và `BANK_INTERNAL_TRANSFER_TO`, **số tiền chính = Amount đã trừ phí**. Dữ liệu thật khớp quy ước này: một dòng Send ghi `Amount -101.01 / Fee 1.01USD / Net 100.00USD` — `Amount` đã gồm cả phí, người nhận thực nhận 100.00. Hai bút toán (gốc 100.00 + phí 1.01) cộng lại đúng 101.01 rút khỏi tài khoản.
+- Master được bổ sung **10 dòng `DataSource = PIPO`** dùng lại đúng các mã `BANK_*` nhưng `BankAccount = 11202061` (PingPong) thay vì `11202001` (Bank CA). Không có bước này thì `classifyOf` không tìm thấy JournalType và **event sẽ không bao giờ post được**.
+- Mặc định `PINGPONG1` → `11202061`. Không dùng `CardNo` (số thẻ/ví, không có trong MappingBankAccount).
+
+**AccountingSource (§7.2)** — 2 sheet nhập tay
+- `Bank_Royal` mang sẵn `BankAccount / ContraAccount / TransAccount` **riêng từng dòng** và khác mặc định của master: `BANK_PAYMENT_SUPPLIER` dùng `33402001/64202001` cho lương và `33102002/64202002` cho phí kế toán, trong khi master mặc định `33111002`. Đây chính là tầng "account nhập trên source".
+- `Amount` trên cả 2 sheet luôn **dương**; chiều tiền nằm ở `BalanceImpact` và được đổi thành dấu ngay ở bước Import: `Debit` = tiền **ra** → số âm; `Credit` = tiền **vào** → số dương. Rule `NegativeMode = REVERSE` tự đảo Nợ/Có khi post.
+- `Master Card` không có cột `ContraAccount`/`BalanceImpact` → Import gán mặc định `ContraAccount = 11202061` (PingPong) và `BalanceImpact = Credit`; giá trị trên dòng (nếu sheet có thêm cột) luôn thắng.
+- `Bank_Royal` là **nguồn duy nhất dùng CAD** → đây là chỗ tỷ giá thực sự được dùng.
+- Cột `Description` của `Bank_Royal` phần lớn là lỗi công thức `#REF!` → `readTable` trả null.
+
+#### 6.11.6 Chống ghi sổ trùng
+
+1 dòng raw ⇄ 1 bộ event, khóa `SourceKey` ổn định → **không cần `ItemCodes` và post-guard theo item**. Chốt chặn nằm ở tầng Import: `RowHash` đổi + `BuildStatus = BUILT` → báo lỗi *"Unbuild {DataSource} trước khi import lại"*. Vì vậy sửa tay cột `JournalType`/`PartnerCode` sau khi đã Build/Post đều bị chặn ngay khi import.
+
+`runBuildSource` **không truyền `deadSourceIds`** cho `reconcileEvents`: dòng biến mất khỏi file chỉ sinh cảnh báo `POSTED_SOURCE_CHANGED`, không chặn các dòng khác cùng `Invoice ID`.
+
+#### 6.11.7 Exception được gom nhóm
+
+Riêng PayPal, rule pair 2 bị bỏ vì JournalType không khai `TransAccount` đã là ~86.000 dòng. Ghi từng dòng thì màn Exceptions vô dụng và DB phình. Nên `build-bank.ts` gom theo `(ExceptionType, Severity, ComCode, SourceKey)` và thêm `— N dòng (VD: …)` vào message. Chạy toàn bộ workbook thật chỉ ra **95 dòng exception** cho 198k event.
+
+Chi tiết từng dòng vẫn nằm ở `RawXxx.BuildMessage`, xem được trên trang raw của nguồn.
+
+Hệ quả: exception của các nguồn này có `Period = null` → `runBuildSource` xóa exception cũ bằng `deleteExceptionsByDataSource` (theo `DataSource` + ComCode) chứ không theo khóa/kỳ như Orders.
+
+#### 6.11.8 Master data đã bổ sung cho các nguồn này
+
+Phải thêm **cùng nội dung vào Google Sheet**, nếu không lần Sync sau sẽ xóa mất (§13.1).
+
+| File | Thêm |
+|---|---|
+| `coa.csv` | `11202091 MasterCard - Available (USD)` |
+| `journal-type.csv` | `STRIPE_RECEIPT_CUSTOMER`, `STRIPE_RESERVE`, và 10 dòng `DataSource = PIPO` cho các mã `BANK_*` (BankAccount `11202061`) |
+| `journal-line-rule.csv` | 2 rule cho `STRIPE_RECEIPT_CUSTOMER` (seq 10 `BANK_CONTRA` AMOUNT, seq 30 `FEE_BANK` FEE), 1 rule cho `STRIPE_RESERVE` |
+| `mapping-bank-account.csv` | 2 số thẻ MasterCard → `11202091`; `PINGPONG1` cho ONTARIO và ZENIROXPAY → `11202061` |
+| `partners.csv` | 9 mã đối tượng file đang dùng mà Partners chưa có: `Paypal ZeniroxPay`, `Stripe ZeniroxPay`, `Pingpong ZeniroxPay`, `MasterCard ZENIROXPAY`, `ZENIROXPAY`, `RoyalBank`, `Royal Bank`, `OneAccounting`, `BANK` |
+
+`BANK` là để khớp `JournalLineRule.FixedPartner = "BANk"` của 6 rule `BANK_*` (code uppercase thành `BANK`) — trước đây thiếu, xem §5.5.
+
+---
+
 ## 7. API reference
 
 Tất cả handler bọc bởi `handle()` (`src/lib/api.ts`): `BadRequestError` → 400 `{error}`; lỗi khác → log + 500 `{error}`.
@@ -615,7 +754,9 @@ Tất cả handler bọc bởi `handle()` (`src/lib/api.ts`): `BadRequestError` 
 | POST | `/api/orders/import-sample` | – | `ImportOrdersResult` | `importOrders` |
 | GET | `/api/orders` | page, pageSize, search, comCode, itemStatus, buildStatus, importBatchId, periodFrom, periodTo | `{rows, total}` | `listRawOrders` |
 | GET | `/api/import-batches` | – | `ImportBatchRow[]` | `listImportBatches` |
-| POST | `/api/build` | body scope | `BuildSummary` | `runBuildOrders` |
+| POST | `/api/sources/[source]/import` | multipart `file`, `sheet?`; `source` ∈ `paypal, stripe, pipo, accounting-source` (khác → 400) | `ImportSourceResult` | `importSourceFile` |
+| GET | `/api/sources/[source]` | page, pageSize, search, comCode, buildStatus, journalType, importBatchId, periodFrom, periodTo | `{rows, total, byStatus, journalTypes}` | `listRawSource` |
+| POST | `/api/build` | body scope; `dataSource` chọn nguồn (trống = `ORDERS`, sai → 400) | `BuildSummary` | `runBuildOrders` / `runBuildSource` |
 | GET | `/api/build-batches` | – | `BuildBatchRow[]` | `listBuildBatches` |
 | POST | `/api/post` | body `classify` + scope | `PostSummary[]` | `runPost` |
 | POST | `/api/unpost` | body `preview?`, `postBatchId?` + scope | `UnpostResult` | `unpost` |
@@ -651,6 +792,8 @@ Dynamic params trong Next 16 là Promise: `(req, ctx: { params: Promise<{ id: st
 ### 8.1 Khung
 - `src/app/layout.tsx`: `<AntdRegistry><AppShell>{children}</AppShell></AntdRegistry>`.
 - `src/components/AppShell.tsx` (client): `ConfigProvider` (locale `vi_VN`, `colorPrimary #1f6feb`), `<App>` (để dùng `App.useApp()`), `Layout.Sider` + `Menu` (key = path). Thêm trang mới → thêm vào hằng `MENU`.
+- `src/app/raw/[source]/page.tsx` là **một trang động dùng chung** cho 4 nguồn ngoài Orders: cột, sheet, cột bắt buộc đều đọc từ `SOURCE_META`. `/raw/orders` là route tĩnh nên không bị route động che.
+- `ScopeBar` có thêm ô **Nguồn** (`dataSource`), dùng chung cho Build (`/events`), Post/Unpost (`/posting`) và lọc GL (`/gl`).
 - Mọi page là client component (`"use client"`), tự fetch API.
 
 ### 8.2 Helper
@@ -736,6 +879,30 @@ Dynamic params trong Next 16 là Promise: `(req, ctx: { params: Promise<{ id: st
 
 Nếu thay đổi làm lệch các số này mà không cố ý đổi nghiệp vụ → là bug.
 
+**Baseline các nguồn ngoài Orders** (file mẫu trong `data/samples/`, trích từ workbook thật — `tests/engine/build-bank.test.ts` + `tests/integration/bank-sources.test.ts`)
+
+| Nguồn | File mẫu | Dòng | Event | Ghi chú |
+|---|---|---:|---:|---|
+| PayPal | `paypal-sample.csv` | 81 | **113** | 1 dòng ERROR `MISSING_JOURNAL_TYPE` (`PP_GENERAL_CURRENCY_CONVERSION`) |
+| Stripe | `stripe-sample.csv` | 48 | **71** | gồm `STRIPE_RECEIPT_CUSTOMER` và `STRIPE_RESERVE` |
+| PIPO | `pipo-sample.csv` | 36 | **48** | 2 dòng `Status = Retrieved` bị bỏ |
+| Master Card | `master-card-sample.csv` | 39 | **39** | Nợ `11202091` / Có `11202061`, Σ = **1.076,87 USD** |
+| Bank_Royal | `bank-royal-sample.csv` | 31 | **55** | CAD → USD, `RateType = DIV` |
+
+Mọi chứng từ của 4 nguồn phải cân Σ Nợ = Σ Có (`assertBalanced` throw nếu lệch).
+
+**Chạy toàn bộ workbook thật** (`Data-khac-order.xlsx`, 29 MB — đã kiểm chứng một lần, không nằm trong test tự động):
+
+| Nguồn | Dòng raw | Event | Chứng từ | Dòng GL | Σ Nợ = Σ Có |
+|---|---:|---:|---:|---:|---:|
+| PayPal | 142.659 | 198.243 | 4.778 | 10.260 | 6.986.394,87 |
+| Stripe | 1.413 | 2.712 | 287 | 928 | 123.799,26 |
+| PIPO | 952 | 969 | 969 | 1.938 | 3.223.338,19 |
+| AccountingSource | 70 | 94 | 94 | 188 | 10.033,85 |
+| **Tổng** | | **202.018** | **6.128** | **13.314** | **10.343.566,17** |
+
+Exception: **95 dòng** (1 ERROR = `PP_GENERAL_CURRENCY_CONVERSION`; 50 WARNING `MISSING_PARTNER` là seller chưa có trong Partners; 44 INFO). Thời gian: import PayPal ~30s, build ~28s, post ~8s; RSS đỉnh ~11,8 GB (xem §13.2).
+
 ### 10.3 Test trình duyệt (tùy chọn, chưa có trong repo)
 Có thể dùng `playwright-core` với Edge có sẵn: `chromium.launch({ channel: "msedge" })`, chạy dev server, `setInputFiles` vào `input[type=file]` của trang `/raw/orders`, bấm các nút Build/Post, kiểm tra text "6,339.70", bắt `page.on("console")` để phát hiện lỗi/cảnh báo. Lưu ý antd render trùng text (dùng `.filter({ visible: true })`), tên nút có kèm aria-label icon (VD `rollback Unbuild`).
 
@@ -743,26 +910,24 @@ Có thể dùng `playwright-core` với Edge có sẵn: `chromium.launch({ chann
 
 ## 11. Hướng dẫn mở rộng
 
-### 11.1 Thêm nguồn dữ liệu mới (PayPal / Stripe / PIPO / AccountingSource)
-Post đã tổng quát, chủ yếu cần Import + Build cho nguồn mới. Làm theo mẫu Orders:
+### 11.1 Thêm nguồn dữ liệu mới
 
-1. **Lấy file mẫu thật** của nguồn (danh sách cột) và đọc yêu cầu trong `tai lieu du an.md` (§7.2 AccountingSource, §7.4 PayPal, §7.5 PIPO, §7.6 Stripe). Đối chiếu output mong đợi với `data/samples/gltrans-reference.csv` (có sẵn các dòng PayPal thật: `PP_HOLD_DISPUTE_INVESTIGATION`, `PP_CHARGEBACK`, `PP_CHARGEBACK_FEE`...).
-2. **Schema:** thêm bảng raw (VD `RawPayPal`, khóa duy nhất = TransactionID) vào `schema.ts` → `npm run db:generate`. Thêm cột danh sách vào file client-safe kiểu `src/lib/<source>/columns.ts`.
-3. **Import:** tạo `normalize` + `services/import-<source>.ts` theo mẫu `import-orders.ts` (RowHash, quy tắc re-import, ImportBatch `DataSource`).
-4. **MasterIndex:** bổ sung lookup còn thiếu:
-   - JournalType theo **loại giao dịch gốc**: `DataSource + JournalType` (PayPal dùng `Type`, Stripe dùng `TransType`) – hiện index chỉ có theo `JournalTypeCode`.
-   - `MappingBankAccount` theo `ComCode + BankAccountNumber` → `GLAccountCode` (BankGLAccount) & `InputCurr` (dữ liệu đã có trong `masters.bankMappings`, chưa có method).
-5. **Engine** `src/lib/engine/build-<source>.ts` trả `{events, exceptions, rawStatus, stats}` như Orders:
-   - Lọc điều kiện (PayPal/Stripe chỉ `Currency = USD`, PIPO `Status = SUCCESS`) → exception khi loại.
-   - Map loại giao dịch → JournalType; thiếu → `MISSING_JOURNAL_TYPE`.
-   - Resolve account: giá trị trên nguồn → MappingBankAccount → mặc định JournalType.
-   - AmountSource: `GROSS`, `FEE`, `NET`, `AMOUNT` từ cột nguồn (rule PayPal pair 3 dùng `FEE` với `AmountFactor = -1`).
-   - `TransactionID` = mã giao dịch nguồn; `BankAccountNumber` = tài khoản nguồn (VD `PAYPAL1`); partner Fixed/From Source.
-   - Mỗi rule active → 1 event (PayPal thường 3 rule: BANK_CONTRA, CONTRA_TRANS, FEE_BANK).
-6. **Service** `build.ts`: thêm `runBuild<Source>` theo mẫu `runBuildOrders` (SourceID riêng, tập SourceKey để xóa exception cũ). Nếu cần thêm ExceptionType → §9.
-7. **Post:** không cần sửa. Classify Single/Bulk đọc từ JournalType. Kiểm tra DocNum/Description khớp `gltrans-reference.csv` (Single PayPal: mỗi event 1 DocNum, Description `Pair N: ... | {TxnID}`, BankAccountNumber `PAYPAL1`).
-8. **API/UI:** route import/build cho nguồn; trang raw mới; Build panel chọn nguồn; thêm vào `MENU`; Dashboard đếm theo nguồn.
-9. **Test:** fixture file mẫu + test engine + mở rộng integration test; ghi baseline mới vào §10.2.
+PayPal / Stripe / PIPO / AccountingSource **đã làm xong** — xem §6.11. Phần dưới là cách thêm nguồn **thứ 5** (VD Payoneer), tận dụng lại khung có sẵn.
+
+Nếu nguồn mới cũng có dạng "1 dòng sao kê ngân hàng/PSP → N bút toán" thì **không phải viết engine mới**, chỉ cần khai báo:
+
+1. **Lấy file mẫu thật** và đọc yêu cầu trong `tai lieu du an.md`. Đối chiếu output với `data/samples/gltrans-reference.csv` (có sẵn dòng GL PayPal thật).
+2. **Schema:** thêm bảng raw vào `schema.ts` dùng lại `bankRawColumns()` (`SourceKey` unique, `PostingDate`, `BuildStatus`, `RowHash`…) + các cột sheet giữ **đúng tên header** → `npm run db:generate`.
+3. **Cột:** thêm danh sách cột + `SOURCE_META` + `SHEET_COLUMNS` vào `src/lib/sources/columns.ts` (client-safe, không import `node:*`).
+4. **Normalize:** thêm `normalize<Source>Row` vào `src/lib/sources/normalize.ts`. Chọn `SourceKey` theo quy tắc §6.11.3 — **không được phụ thuộc cột người dùng điền tay**.
+5. **Spec engine:** thêm `src/lib/engine/sources/<source>.ts` implement `BankSourceSpec` (thuần khai báo). Không viết quy tắc kế toán ở đây — chúng nằm trong `build-bank.ts`.
+6. **Đăng ký:** thêm adapter vào `adapterOf` (`services/import-source.ts`), `builders` (`services/build-source.ts`) và `RAW_SOURCE_TABLES` (`services/queries.ts`).
+7. **Master data:** JournalType phải có dòng với đúng `DataSource` mới — nếu thiếu thì `classifyOf` trả null và **event không bao giờ post được**. Thêm cả `MappingBankAccount` cho số tài khoản mặc định của nguồn.
+8. **Post:** không cần sửa.
+9. **UI:** trang raw `/raw/[source]` và API `/api/sources/[source]` tự chạy theo `SOURCE_META`; chỉ cần thêm 1 dòng vào `MENU` (`src/components/AppShell.tsx`).
+10. **Test:** trích file mẫu vào `data/samples/`, thêm loader vào `tests/helpers/fixtures.ts`, mở rộng `tests/engine/build-bank.test.ts` + `tests/integration/bank-sources.test.ts`, ghi baseline mới vào §10.2.
+
+Nếu nguồn mới có hình dạng khác hẳn (gom nhiều dòng thành 1 event như Orders) thì viết engine riêng theo mẫu `build-orders.ts`.
 
 ### 11.2 Thêm/đổi cột hoặc bảng
 1. Sửa `src/lib/db/schema.ts` (tên cột PascalCase).
@@ -863,13 +1028,23 @@ Test nhanh 1 hàm engine mà không chạy app: viết test trong `tests/engine/
   - VICBEA (FncCurr VND, InputCurr USD): `VND/USD MUL` = bình quân tháng của (mua chuyển khoản + bán)/2 Vietcombank trên các ngày có công bố (tỷ giá mua bán chuyển khoản trung bình — TT200 sửa bởi TT53, TT133 Điều 52, TT99/2025). Kỳ từ 2026 (TT99: lệch ≤ ±1% so với tỷ giá tại ngày giao dịch) tháng nào vượt biên thì đưa vào biên: chỉ 202601 (26,195.24 → 26,189.30). Ngân hàng tham chiếu phải là ngân hàng VICBEA thường xuyên giao dịch; khác Vietcombank thì thay số.
   - Dòng `USD/VND DIV 26500` (202503) của sheet lệch ~3.7% so với thị trường và sai chiều cho công ty VND; giữ nguyên vì là dữ liệu sheet.
 - **Partners bổ sung ngoài Google Sheet (2026-09-17, PartnerID 1931–1942):** 12 seller có trong file order thật nhưng thiếu trong Partners/finance-old. `PartnerCode` = email viết thường, `PartnerName` = `FFT-{StoreName}`, `BankType` PingPong, **`PartnerTaxID` NULL** (không có nguồn mã seller). Sync từ Google Sheet ghi đè cả DB lẫn `data/seed/*.csv` → phải thêm các dòng tỷ giá/seller này vào sheet trước khi Sync.
+- **Giả định của 4 nguồn ngoài Orders (2026-09-21)** — xem §6.11.8 cho danh sách master data đã thêm, tất cả cũng phải đưa vào Google Sheet:
+  - `BalanceImpact` của `Bank_Royal`/`Master Card` hiểu theo quy ước **sao kê ngân hàng**: `Debit` = tiền ra khỏi tài khoản (Amount ghi âm), `Credit` = tiền vào (ghi dương). Suy từ bút toán, không có trong tài liệu: `BANK_BANK_FEE` (Debit) phải ra `Nợ 64200020 / Có 11202001`, và `BANK_INTERNAL_TRANSFER_FROM` (Credit, Contra `11202053`) phải ra `Nợ 11202001 / Có 11202053`.
+  - `Master Card` **không có cột ContraAccount**; cả 39 dòng đều là nhận tiền từ PingPong nên Import gán mặc định `11202061`. Mặc định của JournalType (`11301001` – "Rút PayPal về Bank VN") là sai cho nghiệp vụ này.
+  - Tài khoản GL của thẻ MasterCard (`11202091`) là **tài khoản mới do dự án đặt**, không có trong CoA gốc.
+  - PIPO dùng `JournalType` của `DataSource = PIPO` mới thêm, với `BankAccount = 11202061`. Tài liệu §5.1 coi PIPO là DataSource riêng nhưng master chưa có dòng nào.
+  - `PostingDate` của Stripe lấy cột `Date` (ngày balance transaction), không phải `Created (UTC)` hay `Available On (UTC)` — tài liệu không nói rõ.
+  - `Bank_Royal` và `Master Card` **không có trong §5.1** của tài liệu gốc; xếp vào `AccountingSource` vì cả hai đều điền JournalType của DataSource đó.
+  - 1 dòng PayPal `General Currency Conversion` (`PP_GENERAL_CURRENCY_CONVERSION`) **cố ý để lỗi** `MISSING_JOURNAL_TYPE`: master chỉ có `PP_USER_INITIATED_CURRENCY_CONVERSION`. Chưa tự suy diễn vì là quyết định nghiệp vụ — thêm dòng JournalType vào sheet nếu muốn ghi sổ dòng này.
 
 ### 13.2 Hạn chế kỹ thuật
 - Tài khoản trên event là bản copy lúc Build; rule/tỷ giá/CoA đọc lúc Post.
 - `hasAccount` trả true nếu CoA rỗng.
 - `loadMasterIndex` đọc toàn bộ master mỗi lần gọi (không cache).
 - Build lọc ComCode trong JS (load hết raw theo kỳ); Post load hết candidate vào bộ nhớ; export và `listMaster` (trừ partners) load toàn bộ → chưa tối ưu cho dữ liệu lớn. Đo trên file order thật (55,111 dòng → 156,233 event → 3,350 chứng từ): Import ~20s; Build lần đầu ~30s; Build lại khi đã post ~17s; Build khi phải replace toàn bộ (sau Unpost all) 50–78s; Post ~9s; RSS tiến trình 4–10GB; Export Excel toàn bộ AccountingEvent 4–5 phút. Build/Post chạy đồng bộ trong request → chặn server Next trong lúc chạy; nên Build theo kỳ + ComCode.
+- **Nguồn ngoài Orders chạy cùng kiểu đồng bộ, không chunk** (lựa chọn có ý thức khi làm §6.11). Đo trên workbook thật: import PayPal 142.659 dòng ~30s, Build ~28s (198k event), Post ~8s; **RSS đỉnh ~11,8 GB** — cần `NODE_OPTIONS=--max-old-space-size=12288` cho `next dev`/`next start`, nếu không dễ OOM. Mỗi lần import đọc lại toàn bộ file .xlsx 29 MB (~10–13s) kể cả khi chỉ lấy sheet 31 dòng. Nếu gặp OOM thì hướng sửa là đọc/ghi theo lô ~5.000 dòng trong `importSourceFile` và `runBuildSource`.
 - Unbuild theo ComCode cũng reset raw có `ComCode` null; lọc kỳ bỏ qua raw không có `FulfilledAt`.
+- `runBuildSource` lọc kỳ bằng so sánh chuỗi `PostingDate` với `YYYY-MM-01`…`YYYY-MM-31` (không dùng `periodOfDateColumn`) → dòng không có `PostingDate` bị bỏ khi có lọc kỳ.
 - Unpost không reset event `SKIPPED` / `ERROR` giai đoạn POST.
 - Không khóa kỳ, không audit log thao tác, không auth.
 - SQLite 1 process; không phù hợp nhiều instance.

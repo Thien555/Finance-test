@@ -1,6 +1,13 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { AccountingEventRow, RawOrderRow } from "@/lib/db/schema";
+import type {
+  AccountingEventRow,
+  RawAccountingSourceRow,
+  RawOrderRow,
+  RawPaypalRow,
+  RawPipoRow,
+  RawStripeRow,
+} from "@/lib/db/schema";
 import type { EventDraft } from "@/lib/engine/types";
 import { MasterIndex, type Masters } from "@/lib/engine/masters";
 import { readTable } from "@/lib/io/read-table";
@@ -14,6 +21,13 @@ import {
 } from "@/lib/master/parse-master";
 import { DEFAULT_COMPANIES, DEFAULT_GATEWAY_MAPPINGS } from "@/lib/master/sources";
 import { canonicalHeaders, normalizeOrderRow } from "@/lib/orders/normalize";
+import { canonicalHeaderMap, SHEET_COLUMNS } from "@/lib/sources/columns";
+import {
+  normalizeAccountingSourceRow,
+  normalizePaypalRow,
+  normalizePipoRow,
+  normalizeStripeRow,
+} from "@/lib/sources/normalize";
 
 const root = path.resolve(import.meta.dirname, "..", "..");
 const seed = (file: string) => readFileSync(path.join(root, "data", "seed", file), "utf8");
@@ -46,9 +60,60 @@ export async function loadSampleOrders(file = "orders-sample.csv"): Promise<RawO
   });
 }
 
+/** Đọc file mẫu của 1 sheet nguồn ngoài Orders qua đúng normalizer thật */
+async function loadSourceSample<T>(
+  file: string,
+  sheet: string,
+  normalize: (record: Record<string, unknown>, map: Map<string, string>) => { ok: true; row: T } | { ok: false; error: string },
+): Promise<T[]> {
+  const buffer = readFileSync(path.join(root, "data", "samples", file));
+  const table = await readTable(buffer, file);
+  const spec = SHEET_COLUMNS[sheet];
+  const { map, missing } = canonicalHeaderMap(table.headers, spec.columns, spec.required);
+  if (missing.length) throw new Error(`${file} thiếu cột: ${missing.join(", ")}`);
+  return table.records.map((record, i) => {
+    const r = normalize(record, map);
+    if (!r.ok) throw new Error(`Row ${i + 2}: ${r.error}`);
+    return r.row;
+  });
+}
+
+export async function loadSamplePaypal(file = "paypal-sample.csv"): Promise<RawPaypalRow[]> {
+  const rows = await loadSourceSample(file, "Bank_Paypal", (record, map) =>
+    normalizePaypalRow(record, map, SHEET_COLUMNS.Bank_Paypal.columns),
+  );
+  return rows.map((row, i) => ({ ...row, RawPaypalID: i + 1, ImportBatchID: 1 }) as RawPaypalRow);
+}
+
+export async function loadSampleStripe(file = "stripe-sample.csv"): Promise<RawStripeRow[]> {
+  const rows = await loadSourceSample(file, "Bank_Stripe", (record, map) =>
+    normalizeStripeRow(record, map, SHEET_COLUMNS.Bank_Stripe.columns),
+  );
+  return rows.map((row, i) => ({ ...row, RawStripeID: i + 1, ImportBatchID: 1 }) as RawStripeRow);
+}
+
+export async function loadSamplePipo(file = "pipo-sample.csv"): Promise<RawPipoRow[]> {
+  const rows = await loadSourceSample(file, "Bank_Pipo", (record, map) =>
+    normalizePipoRow(record, map, SHEET_COLUMNS.Bank_Pipo.columns),
+  );
+  return rows.map((row, i) => ({ ...row, RawPipoID: i + 1, ImportBatchID: 1 }) as RawPipoRow);
+}
+
+export async function loadSampleAccountingSource(
+  file: string,
+  sheet: "Master Card" | "Bank_Royal",
+  startId = 1,
+): Promise<RawAccountingSourceRow[]> {
+  const seen = new Map<string, number>();
+  const rows = await loadSourceSample(file, sheet, (record, map) =>
+    normalizeAccountingSourceRow(record, map, SHEET_COLUMNS[sheet].columns, sheet, seen),
+  );
+  return rows.map((row, i) => ({ ...row, RawAccountingSourceID: startId + i, ImportBatchID: 1 }) as RawAccountingSourceRow);
+}
+
 /** Giả lập insert DB: gán AccountingEventID tăng dần */
 export function toEventRows(drafts: EventDraft[], startId = 1000): AccountingEventRow[] {
-  return drafts.map(({ rawOrderIds: _ignored, ...d }, i) => ({
+  return drafts.map(({ rawRowIds: _ignored, ...d }, i) => ({
     AccountingEventID: startId + i,
     LineSeq: 1,
     PairCode: null,
