@@ -8,15 +8,9 @@
 
 ## Tổng quan dự án
 
-Công ty bán hàng theo mô hình dropshipping: seller bên ngoài mở store và bán, công ty đứng tên thu tiền của người mua qua các cổng thanh toán, rồi trả lại phần lợi nhuận đã thỏa thuận cho seller.
+Hệ thống nhận file order thô, gom nhóm rồi sinh bút toán và ghi vào sổ cái qua 3 bước **Import → Build → Post**. Quy tắc ghi sổ — tài khoản, vế Nợ / vế Có, gom chứng từ, tỷ giá — khai báo ở sáu bảng danh mục đồng bộ từ Google Sheet (`CoA`, `JournalType`, `JournalLineRule`, `Partners`, `Exrate`, `MappingBankAccount`), không viết cứng trong mã nguồn.
 
-Một dòng order vì thế mang bốn khoản khác hẳn nhau về bản chất kế toán: tiền hàng, phí ship, thuế thu hộ và lợi nhuận phải trả seller. Việc ghi sổ vướng ba chỗ:
-
-- **Khối lượng.** Đo trên file order thật: 55.111 dòng → 156.233 event → 3.350 chứng từ.
-- **Pháp nhân ghi sổ không có sẵn trên file**, phải suy ra từ cổng thanh toán của từng dòng.
-- **Đối tượng công nợ phải chính xác.** Mỗi đồng lợi nhuận phải về đúng seller thì số dư `33102001 Phải trả Seller` mới phản ánh đúng — danh mục hiện có 1.879 seller.
-
-Hệ thống nhận file order, gom nhóm, sinh bút toán theo quy tắc kế toán đã khai báo, ghi vào sổ cái và lưu nhật ký từng lần chạy để truy ngược mọi dòng sổ về dòng order gốc. Sai thì làm lại bằng Unpost / Unbuild, không sửa tay vào sổ cái.
+Mỗi lần chạy có nhật ký riêng nên mọi dòng sổ cái truy ngược được về dòng order gốc; sai thì làm lại bằng Unpost / Unbuild, không sửa tay vào sổ cái. Khối lượng đo trên file order thật: 55.111 dòng → 156.233 event → 3.350 chứng từ.
 
 **Phạm vi hiện tại**
 
@@ -28,8 +22,6 @@ Hệ thống nhận file order, gom nhóm, sinh bút toán theo quy tắc kế t
 | Đăng nhập, phân quyền | Chưa có. Ai mở được web thì chạy được mọi thao tác |
 | Khóa kỳ kế toán OPEN / LOCKED | Chưa có. Kỳ đã ghi sổ vẫn Unpost và ghi lại được |
 | Công ty cha – con, nhật ký thao tác người dùng | Chưa có |
-
-Nguyên tắc thiết kế cốt lõi, theo đúng yêu cầu gốc §2.3 *"rule-driven engine"*: **quy tắc ghi sổ nằm ở danh mục do kế toán khai báo, không viết cứng trong mã nguồn.** Sáu bảng danh mục đồng bộ từ Google Sheet — 222 tài khoản `CoA`, 57 `JournalType`, 137 `JournalLineRule`, 1.939 dòng `Partners`, 63 dòng `Exrate`, 10 dòng `MappingBankAccount`. Đổi tài khoản hạch toán, thêm seller, bổ sung tỷ giá: sửa trên sheet rồi Build lại, không cần sửa mã nguồn.
 
 > ⚠️ **Trước khi bấm Sync.** 45 dòng `Exrate` và 12 dòng `Partners` đang dùng hiện chỉ có trong hệ thống, **chưa có trên Google Sheet**. Sync ghi đè toàn bộ danh mục nên phải đưa các dòng này lên sheet trước, nếu không sẽ mất.
 
