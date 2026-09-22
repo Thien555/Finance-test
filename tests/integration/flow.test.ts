@@ -20,7 +20,9 @@ describe("luồng Orders → GLTrans trên DB", async () => {
   const { listGl, listEvents, dashboardStats } = await import("@/lib/services/queries");
   const { glWorkbook, GL_EXPORT_COLUMNS } = await import("@/lib/services/export");
   const { allGl } = await import("@/lib/services/queries");
-  const { closeDb } = await import("@/lib/db/client");
+  const { getDb, closeDb } = await import("@/lib/db/client");
+  const { seedTestCompanies } = await import("../helpers/fixtures");
+  seedTestCompanies(getDb());
 
   afterAll(() => {
     closeDb();

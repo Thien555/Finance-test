@@ -1,11 +1,13 @@
 /**
- * Parse CSV export của các sheet master → row để insert DB.
+ * Parse CSV export của các sheet master (+ snapshot Company/GatewayCompanyMapping) → row để insert DB.
  * Xử lý: chuỗi "NULL", số dấu phẩy thập phân, header cột ContraAccount bị ghi nhầm "11202052".
  */
 import Papa from "papaparse";
 import type {
   CoARow,
+  CompanyRow,
   ExrateRow,
+  GatewayCompanyMappingRow,
   JournalLineRuleRow,
   JournalTypeRow,
   MappingBankAccountRow,
@@ -148,4 +150,30 @@ export function parseBankMappings(text: string): Omit<MappingBankAccountRow, "ID
       IsActive: toFlag(g(r, "IsActive"), 1),
     }))
     .filter((r) => r.ComCode && r.BankAccountNumber);
+}
+
+/** ComCode / FunctionalCurrency viết hoa như khi sửa trên web (`upsertCompany`) */
+export function parseCompanies(text: string): CompanyRow[] {
+  const { header, rows } = parseCsv(text);
+  const g = getter(header);
+  return rows
+    .map((r) => ({
+      ComCode: (toText(g(r, "ComCode")) ?? "").toUpperCase(),
+      CompanyName: toText(g(r, "CompanyName")),
+      FunctionalCurrency: (toText(g(r, "FunctionalCurrency")) ?? "USD").toUpperCase(),
+      IsActive: toFlag(g(r, "IsActive"), 1),
+    }))
+    .filter((r) => r.ComCode);
+}
+
+export function parseGatewayMappings(text: string): Omit<GatewayCompanyMappingRow, "ID">[] {
+  const { header, rows } = parseCsv(text);
+  const g = getter(header);
+  return rows
+    .map((r) => ({
+      PaymentGatewayName: toText(g(r, "PaymentGatewayName")) ?? "",
+      ComCode: (toText(g(r, "ComCode")) ?? "").toUpperCase(),
+      IsActive: toFlag(g(r, "IsActive"), 1),
+    }))
+    .filter((r) => r.PaymentGatewayName && r.ComCode);
 }

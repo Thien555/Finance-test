@@ -11,6 +11,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 - `npm run dev` – dev server (lần đầu tự migrate + seed `data/finance.db`)
 - `npm test` · `npx tsc --noEmit` · `npm run lint` · `npm run build`
 - `npm run db:generate` (sau khi sửa schema) · `npm run db:seed` · `npm run db:reset` (tắt dev server trước)
+- `npm run db:export-seed` – ghi Company/GatewayCompanyMapping (sửa trên web, không có trong sheet) từ DB ra `data/seed` để commit
 
 ## Bản đồ code
 

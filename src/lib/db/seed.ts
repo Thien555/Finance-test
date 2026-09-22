@@ -1,18 +1,23 @@
 /**
  * Seed master data từ snapshot CSV (data/seed) hoặc từ nội dung CSV tải về Google Sheet.
+ * Company & GatewayCompanyMapping (sửa trên web, không có trong sheet) có snapshot riêng, đọc/ghi 2 chiều với DB.
  */
 import fs from "node:fs";
 import path from "node:path";
-import { count } from "drizzle-orm";
+import { asc, count } from "drizzle-orm";
+import type { SQLiteTable } from "drizzle-orm/sqlite-core";
+import Papa from "papaparse";
 import {
   parseBankMappings,
   parseCoA,
+  parseCompanies,
   parseExrates,
+  parseGatewayMappings,
   parseJournalLineRules,
   parseJournalTypes,
   parsePartners,
 } from "@/lib/master/parse-master";
-import { DEFAULT_COMPANIES, DEFAULT_GATEWAY_MAPPINGS, MASTER_SHEETS, type MasterSheetKey } from "@/lib/master/sources";
+import { LOCAL_MASTER_FILES, MASTER_SHEETS, type MasterSheetKey } from "@/lib/master/sources";
 import type { AppDb } from "./client";
 import {
   coa,
@@ -29,8 +34,10 @@ export type MasterCsvTexts = Record<MasterSheetKey, string>;
 
 export const SEED_DIR = path.join(process.cwd(), "data", "seed");
 
+const readSeed = (file: string) => fs.readFileSync(path.join(SEED_DIR, file), "utf8");
+
 export function readSnapshotTexts(): MasterCsvTexts {
-  const read = (key: MasterSheetKey) => fs.readFileSync(path.join(SEED_DIR, MASTER_SHEETS[key].file), "utf8");
+  const read = (key: MasterSheetKey) => readSeed(MASTER_SHEETS[key].file);
   return {
     partners: read("partners"),
     journalType: read("journalType"),
@@ -83,15 +90,52 @@ export function replaceMasters(db: AppDb, texts: MasterCsvTexts) {
   return Object.fromEntries(Object.entries(parsed).map(([k, v]) => [k, v.length])) as Record<MasterSheetKey, number>;
 }
 
-export function seedDefaults(db: AppDb) {
-  const [{ n: companies }] = db.select({ n: count() }).from(company).all();
-  if (companies === 0) db.insert(company).values(DEFAULT_COMPANIES).run();
-  const [{ n: mappings }] = db.select({ n: count() }).from(gatewayCompanyMapping).all();
-  if (mappings === 0) db.insert(gatewayCompanyMapping).values(DEFAULT_GATEWAY_MAPPINGS).run();
+/** Snapshot Company & GatewayCompanyMapping (data/seed/company.csv, gateway-company-mapping.csv) */
+export function readCompanySnapshot() {
+  const companies = parseCompanies(readSeed(LOCAL_MASTER_FILES.company));
+  const gatewayMappings = parseGatewayMappings(readSeed(LOCAL_MASTER_FILES.gatewayCompanyMapping));
+  if (companies.length === 0) throw new Error(`${LOCAL_MASTER_FILES.company} không có dữ liệu hợp lệ`);
+  if (gatewayMappings.length === 0) throw new Error(`${LOCAL_MASTER_FILES.gatewayCompanyMapping} không có dữ liệu hợp lệ`);
+  return { companies, gatewayMappings };
 }
 
+/**
+ * Nạp snapshot Company & GatewayCompanyMapping: thêm mới hoặc cập nhật theo ComCode / PaymentGatewayName,
+ * không xóa dòng chỉ có trong DB (2 bảng này sửa trên web). `tables` chọn bảng cần nạp.
+ */
+export function upsertCompanySnapshot(db: AppDb, tables = { company: true, gatewayCompanyMapping: true }) {
+  const { companies, gatewayMappings } = readCompanySnapshot();
+  db.transaction((tx) => {
+    if (tables.company) {
+      for (const c of companies) tx.insert(company).values(c).onConflictDoUpdate({ target: company.ComCode, set: c }).run();
+    }
+    if (tables.gatewayCompanyMapping) {
+      for (const m of gatewayMappings) {
+        tx.insert(gatewayCompanyMapping).values(m).onConflictDoUpdate({ target: gatewayCompanyMapping.PaymentGatewayName, set: m }).run();
+      }
+    }
+  });
+  return {
+    company: tables.company ? companies.length : 0,
+    gatewayCompanyMapping: tables.gatewayCompanyMapping ? gatewayMappings.length : 0,
+  };
+}
+
+/** Ghi Company & GatewayCompanyMapping trong DB ra snapshot (`npm run db:export-seed`); mapping giữ thứ tự ID */
+export function writeCompanySnapshot(db: AppDb, dir = SEED_DIR) {
+  const companies = db.select().from(company).orderBy(asc(company.ComCode)).all();
+  const gatewayMappings = db.select().from(gatewayCompanyMapping).orderBy(asc(gatewayCompanyMapping.ID)).all();
+  const write = <T extends object>(file: string, rows: T[], columns: (keyof T & string)[]) =>
+    fs.writeFileSync(path.join(dir, file), `${Papa.unparse(rows, { columns, newline: "\n" })}\n`, "utf8");
+  write(LOCAL_MASTER_FILES.company, companies, ["ComCode", "CompanyName", "FunctionalCurrency", "IsActive"]);
+  write(LOCAL_MASTER_FILES.gatewayCompanyMapping, gatewayMappings, ["PaymentGatewayName", "ComCode", "IsActive"]);
+  return { company: companies.length, gatewayCompanyMapping: gatewayMappings.length };
+}
+
+const isEmpty = (db: AppDb, table: SQLiteTable) => db.select({ n: count() }).from(table).get()?.n === 0;
+
 export function seedMastersIfEmpty(db: AppDb) {
-  const [{ n }] = db.select({ n: count() }).from(journalType).all();
-  if (n === 0) replaceMasters(db, readSnapshotTexts());
-  seedDefaults(db);
+  if (isEmpty(db, journalType)) replaceMasters(db, readSnapshotTexts());
+  const tables = { company: isEmpty(db, company), gatewayCompanyMapping: isEmpty(db, gatewayCompanyMapping) };
+  if (tables.company || tables.gatewayCompanyMapping) upsertCompanySnapshot(db, tables);
 }

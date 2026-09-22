@@ -15,13 +15,11 @@ export type MasterSheetKey = keyof typeof MASTER_SHEETS;
 export const sheetCsvUrl = (gid: string, spreadsheetId = MASTER_SPREADSHEET_ID) =>
   `https://docs.google.com/spreadsheets/d/${spreadsheetId}/export?format=csv&gid=${gid}`;
 
-/** Company & GatewayCompanyMapping không có trong sheet → seed mặc định, sửa trên web */
-export const DEFAULT_COMPANIES = [
-  { ComCode: "ZENIROXPAY", CompanyName: "ZeniroxPay Inc.", FunctionalCurrency: "USD", IsActive: 1 },
-  { ComCode: "ONTARIO", CompanyName: "Ontario", FunctionalCurrency: "USD", IsActive: 1 },
-];
-
-export const DEFAULT_GATEWAY_MAPPINGS = [
-  { PaymentGatewayName: "ZeniroxPay Inc.", ComCode: "ZENIROXPAY", IsActive: 1 },
-  { PaymentGatewayName: "ZeniroxPay - Stripe", ComCode: "ZENIROXPAY", IsActive: 1 },
-];
+/**
+ * Company & GatewayCompanyMapping không có trong sheet → sửa trên web; snapshot trong data/seed
+ * ghi từ DB bằng `npm run db:export-seed` (Sync Google Sheet không đụng tới).
+ */
+export const LOCAL_MASTER_FILES = {
+  company: "company.csv",
+  gatewayCompanyMapping: "gateway-company-mapping.csv",
+} as const;

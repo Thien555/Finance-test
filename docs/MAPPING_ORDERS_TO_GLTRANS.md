@@ -34,7 +34,7 @@ Toàn bộ số liệu **không phải số minh họa tự nghĩ ra**. Chúng �
 1. `importOrders(data/samples/orders-sample.csv)`: import file order mẫu (64 dòng).
 2. `runBuildOrders()`: build toàn bộ, không giới hạn phạm vi.
 3. `runPost("All")`: post Single rồi Bulk.
-4. Master data: snapshot `data/seed/*.csv` cùng Company và GatewayCompanyMapping mặc định (`src/lib/master/sources.ts`).
+4. Master data: snapshot `data/seed/*.csv`, kể cả Company và GatewayCompanyMapping (`company.csv`, `gateway-company-mapping.csv`).
 
 Kết quả khớp baseline của dự án: **64 dòng raw → 174 AccountingEvent → 21 chứng từ / 42 dòng GLTrans, Σ Nợ = Σ Có = 6,339.70**.
 
@@ -135,7 +135,7 @@ Sau này khi thực trả tiền cho seller (nguồn ngân hàng, **chưa code**
 ### 1.7. Nguyên tệ, tiền hạch toán và tỷ giá
 
 - **InputCurr** (nguyên tệ): tiền của giao dịch. Với Orders, code cố định là `USD`.
-- **FncCurr** (functional currency, tiền hạch toán): tiền mà công ty dùng để lập sổ, lấy từ `Company.FunctionalCurrency`. Hai công ty mặc định đều là `USD`.
+- **FncCurr** (functional currency, tiền hạch toán): tiền mà công ty dùng để lập sổ, lấy từ `Company.FunctionalCurrency`. `ZENIROXPAY` (công ty của file mẫu) và `MESSIPAY` là `USD`, `ONTARIO` là `CAD`, `VICBEA` là `VND`.
 - Nếu hai loại tiền khác nhau thì phải quy đổi: `Accounted = Input × XRate` (`RateType = MUL`) hoặc `Input ÷ XRate` (`DIV`). Cùng tiền thì `XRate = 1`.
 
 ### 1.8. Chứng từ, sổ cái, kỳ
@@ -211,14 +211,16 @@ Master data là **bảng cấu hình**. Engine không viết cứng tài khoản
 | 1 | `ZeniroxPay Inc.` | `ZENIROXPAY` | 1 |
 | 2 | `ZeniroxPay - Stripe` | `ZENIROXPAY` | 1 |
 
-Cột `PaymentGatewayName` của file order được tra ở đây để ra `ComCode`. Khóa tra là **tên** cổng (không phải `PaymentGatewayId`). Bảng này không có trong Google Sheet; nó được tạo mặc định và sửa ở trang Master.
+Cột `PaymentGatewayName` của file order được tra ở đây để ra `ComCode`. Khóa tra là **tên** cổng (không phải `PaymentGatewayId`). Bảng trên chỉ liệt kê 2 cổng mà file order mẫu dùng; snapshot `data/seed/gateway-company-mapping.csv` có 24 cổng (ZeniroxPay và Ontario các loại key). Bảng này không có trong Google Sheet: sửa ở trang Master rồi xuất ra `data/seed` bằng `npm run db:export-seed`.
 
 ### 3.2. `Company`: công ty ghi sổ
 
 | ComCode | CompanyName | FunctionalCurrency | IsActive |
 |---|---|---|---|
-| `ZENIROXPAY` | ZeniroxPay Inc. | USD | 1 |
-| `ONTARIO` | Ontario | USD | 1 |
+| `MESSIPAY` | MessiPay Partner | USD | 1 |
+| `ONTARIO` | Ontario Operations | CAD | 1 |
+| `VICBEA` | Vicbea Operations | VND | 1 |
+| `ZENIROXPAY` | Zenibox PayPal Partner — ZeniroxPay | USD | 1 |
 
 `FunctionalCurrency` trở thành `FncCurr` của event.
 

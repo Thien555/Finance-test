@@ -30,6 +30,8 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
   const { unpost, unbuild, resetTransactionalData } = await import("@/lib/services/clear");
   const { upsertGatewayMapping, deleteGatewayMapping } = await import("@/lib/services/master");
   const { getDb, closeDb } = await import("@/lib/db/client");
+  const { seedTestCompanies } = await import("../helpers/fixtures");
+  seedTestCompanies(getDb());
 
   afterAll(() => {
     closeDb();

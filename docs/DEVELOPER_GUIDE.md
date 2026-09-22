@@ -81,7 +81,8 @@ Auth/phân quyền (§20), Company tree & Accounting Period lock (§4), Manual E
 | `npm run lint` | ESLint |
 | `npx tsc --noEmit` | Typecheck |
 | `npm run db:generate` | Sinh migration SQL vào `drizzle/` sau khi sửa `schema.ts` |
-| `npm run db:seed` | Nạp lại 6 bảng master từ `data/seed/*.csv` |
+| `npm run db:seed` | Nạp lại master từ `data/seed/*.csv`: thay toàn bộ 6 bảng sheet; Company & GatewayCompanyMapping thêm/cập nhật, không xóa dòng chỉ có trong DB (§5.3) |
+| `npm run db:export-seed` | Ghi Company & GatewayCompanyMapping trong DB ra `data/seed/company.csv`, `gateway-company-mapping.csv` (sau khi sửa trên web, để commit sang máy khác) |
 | `npm run db:reset` | Xóa `data/finance.db*` (phải tắt dev server trước trên Windows) |
 
 **Cài dependency:** `npm ci` (hoặc `npm i`), Node ≥ 22. Không cần Python hay Visual C++ Build Tools. File `.npmrc` đặt `ignore-scripts=true` vì npm bỏ qua `"gypfile": false` của `better-sqlite3` 13 (lấy metadata từ lockfile) nên vẫn gọi `node-gyp rebuild`. Lệnh này lỗi trên máy không có toolchain, dù gói đã kèm sẵn binary `prebuilds/<platform>-<arch>.node`. Các install script khác trong cây phụ thuộc (esbuild, unrs-resolver, fsevents) chỉ để kiểm tra hoặc dự phòng, bỏ qua không ảnh hưởng. Nếu sau này thêm gói **thật sự cần** postinstall: `npm rebuild <gói> --ignore-scripts=false`. Script gốc (`npm run dev`, `npm test`...) vẫn chạy bình thường, chỉ hook `pre*`/`post*` bị bỏ qua.
@@ -115,14 +116,15 @@ README.md                         Hướng dẫn chạy nhanh
 CLAUDE.md / AGENTS.md             Ngữ cảnh cho AI (AGENTS.md có block do `next dev` tự quản lý)
 docs/DEVELOPER_GUIDE.md           File này
 data/
-  seed/*.csv                      Snapshot 6 sheet master (seed DB)
+  seed/*.csv                      Snapshot 6 sheet master + company.csv, gateway-company-mapping.csv (seed DB)
   samples/orders-sample.csv|.xlsx File order mẫu 64 dòng (dùng cho test + nút "Import file mẫu")
   samples/paypal|stripe|pipo|master-card|bank-royal-sample.csv
                                   Mẫu trích từ Data-khac-order.xlsx cho test 4 nguồn ngoài Orders
   samples/*-reference.csv         Mẫu GlTrans/AccountingEvent/PostingBatch từ hệ thống cũ để đối chiếu format
   finance.db                      SQLite (gitignore, tự tạo)
 drizzle/                          Migration SQL (0000_init.sql) + meta
-scripts/seed.ts, reset-db.ts      Script npm db:seed / db:reset
+scripts/seed.ts, export-seed.ts, reset-db.ts
+                                  Script npm db:seed / db:export-seed / db:reset
 src/
   app/
     layout.tsx                    AntdRegistry + AppShell
@@ -148,7 +150,7 @@ src/
     gl-filter.ts                  URLSearchParams → GlFilter
     db/schema.ts                  Drizzle schema 19 bảng + type
     db/client.ts                  getDb() (migrate + seed lần đầu), closeDb, DB_FILE
-    db/seed.ts                    replaceMasters, seedMastersIfEmpty, seedDefaults, readSnapshotTexts
+    db/seed.ts                    replaceMasters, seedMastersIfEmpty, readSnapshotTexts, read/upsert/writeCompanySnapshot
     engine/
       parse.ts                    parseNumber, parseDate, parseDateTime, toText, toFlag, isBlank, nowIso
       keys.ts                     ymd, periodOf, orderTransactionId, orderSourceId, singleDocNum, bulkDocNum, postingGroupKey, eventKey, sha256
@@ -163,8 +165,8 @@ src/
       post-guard.ts               findDuplicateItems (chốt chặn lúc Post: item đã/đang ghi sổ dưới khóa khác)
       types.ts                    ExceptionType, ExceptionDraft, EventDraft, GlLineDraft
     io/read-table.ts              readTable (CSV/XLSX → records)
-    master/sources.ts             ID Google Sheet + gid, DEFAULT_COMPANIES, DEFAULT_GATEWAY_MAPPINGS
-    master/parse-master.ts        Parse CSV 6 bảng master
+    master/sources.ts             ID Google Sheet + gid, LOCAL_MASTER_FILES (tên file snapshot Company/Gateway)
+    master/parse-master.ts        Parse CSV 8 bảng master
     orders/columns.ts             46 cột file order – client-safe
     orders/normalize.ts           canonicalHeaders, normalizeOrderRow
     sources/columns.ts            Cột 5 sheet ngoài Orders, SOURCE_META, SHEET_COLUMNS, canonicalHeaderMap – client-safe
@@ -312,7 +314,7 @@ Không có foreign key; liên kết qua giá trị:
 Sơ đồ toàn cảnh 15 bảng + ERD 5 bảng lõi: [`BA_ORDERS_TO_GLTRANS.md` § Sơ đồ quan hệ dữ liệu](BA_ORDERS_TO_GLTRANS.md#sơ-đồ-quan-hệ-dữ-liệu). Chuỗi tra cứu master: [`MAPPING_ORDERS_TO_GLTRANS.md` §12.1](MAPPING_ORDERS_TO_GLTRANS.md).
 
 ### 4.3 Kết nối, migrate, seed
-- `getDb()` (`src/lib/db/client.ts`): mở `DATABASE_PATH` hoặc `data/finance.db`, bật WAL, chạy `migrate()` với `drizzle/`, gọi `seedMastersIfEmpty()` (nếu `JournalType` rỗng → nạp snapshot; nếu `Company`/`GatewayCompanyMapping` rỗng → nạp mặc định). Instance cache trên `globalThis.__financeDb` (sống qua HMR).
+- `getDb()` (`src/lib/db/client.ts`): mở `DATABASE_PATH` hoặc `data/finance.db`, bật WAL, chạy `migrate()` với `drizzle/`, gọi `seedMastersIfEmpty()` (nếu `JournalType` rỗng → nạp snapshot 6 bảng sheet; bảng `Company`/`GatewayCompanyMapping` nào rỗng → nạp từ `company.csv`/`gateway-company-mapping.csv`; bảng đã có dữ liệu thì không đụng). Instance cache trên `globalThis.__financeDb` (sống qua HMR).
 - **Đổi schema:** sửa `schema.ts` → `npm run db:generate` (tạo `drizzle/000X_*.sql`) → restart dev. Với dữ liệu test có thể `npm run db:reset`.
 - Transaction better-sqlite3 là **đồng bộ**: `db.transaction((tx) => { tx.insert(...).run(); ... })`. Không `await` bên trong callback.
 
@@ -335,9 +337,14 @@ Sơ đồ toàn cảnh 15 bảng + ERD 5 bảng lõi: [`BA_ORDERS_TO_GLTRANS.md`
 - `parseMasterTexts` parse cả 6 bảng trước, bảng nào rỗng thì throw → không ghi DB.
 
 ### 5.3 Company & GatewayCompanyMapping
-Mặc định (`DEFAULT_COMPANIES`, `DEFAULT_GATEWAY_MAPPINGS`):
-- Company `ZENIROXPAY` (USD), `ONTARIO` (USD).
-- `ZeniroxPay Inc.` → `ZENIROXPAY`, `ZeniroxPay - Stripe` → `ZENIROXPAY` (user đã chốt: company = cổng thanh toán; cả 2 gateway cùng 1 công ty).
+Không có trong Google Sheet, sửa ở trang `/master`. Snapshot trong `data/seed` (`LOCAL_MASTER_FILES`) là dữ liệu thật xuất từ DB, không phải giá trị mặc định:
+- `company.csv`: `ComCode, CompanyName, FunctionalCurrency, IsActive`. Snapshot 2026-09-22: `ZENIROXPAY`, `MESSIPAY` USD · `ONTARIO` CAD · `VICBEA` VND.
+- `gateway-company-mapping.csv`: `PaymentGatewayName, ComCode, IsActive` theo thứ tự ID (DB mới được ID 1..n đúng thứ tự file). 24 cổng; `ZeniroxPay Inc.` và `ZeniroxPay - Stripe` → `ZENIROXPAY` (user đã chốt: company = cổng thanh toán).
+- Parse (`parseCompanies`, `parseGatewayMappings`): `ComCode`/`FunctionalCurrency` viết hoa như `upsertCompany`, tiền tệ trống → `USD`, bỏ dòng thiếu khóa; file không còn dòng hợp lệ → throw.
+- **Chuyển sang máy khác:** sửa trên web → `npm run db:export-seed` → commit 2 file → máy kia `git pull` + `npm run db:seed` (DB mới thì `npm run dev` tự nạp).
+- `upsertCompanySnapshot` (dùng bởi `db:seed`) thêm mới hoặc cập nhật theo `ComCode` / `PaymentGatewayName` trong 1 transaction, **không xóa** dòng chỉ có trong DB. Dòng trùng khóa bị đè bằng giá trị trong file → sửa trên web mà chưa export thì `db:seed` trả về giá trị cũ. Muốn bỏ 1 cổng ở máy khác thì xóa trên web máy đó.
+- Đổi `FunctionalCurrency` của công ty đã có event (vd. máy cũ có `ONTARIO` USD, snapshot là CAD): event chưa post nhận `FncCurr` mới ở lần Build sau; event **đã post giữ `FncCurr` cũ mà Build không báo gì** (`FncCurr` không nằm trong `eventKey`/`SourceHash`) → muốn quy đổi lại phải Unpost → Build → Post phạm vi công ty đó (§6.4).
+- Test không dùng snapshot này mà dùng bộ cố định `TEST_COMPANIES`/`TEST_GATEWAY_MAPPINGS` (§10.1).
 
 ### 5.4 `MasterIndex` (`src/lib/engine/masters.ts`)
 Tạo từ `Masters` (8 mảng). So khớp **trim + UPPERCASE**.
@@ -847,7 +854,8 @@ Dynamic params trong Next 16 là Promise: `(req, ctx: { params: Promise<{ id: st
 ### 10.1 Cấu trúc
 - `vitest.config.mts`: alias `@` → `src`, chạy `tests/**/*.test.ts`, môi trường node.
 - `tests/helpers/fixtures.ts`:
-  - `loadMasters()` / `loadIndex(overrides?)` – master từ `data/seed/*.csv` + Company/Gateway mặc định (không cần DB).
+  - `loadMasters()` / `loadIndex(overrides?)` – master từ `data/seed/*.csv` (không cần DB), riêng Company/Gateway lấy bộ cố định `TEST_COMPANIES` (`ZENIROXPAY`, `ONTARIO` đều USD) + `TEST_GATEWAY_MAPPINGS` (`ZeniroxPay Inc.`, `ZeniroxPay - Stripe` → `ZENIROXPAY`). Không lấy snapshot vì 2 bảng đó sửa trên web (`ONTARIO` thật là CAD), còn các test đổi cổng cần `ONTARIO` cùng tiền với `ZENIROXPAY`.
+  - `seedTestCompanies(db)` – test integration gọi ngay sau `getDb()` để thay Company/Gateway vừa seed từ snapshot bằng bộ cố định trên.
   - `loadSampleOrders(file?)` – đọc `data/samples/orders-sample.csv|.xlsx` qua `readTable` + `normalizeOrderRow`, gán `RawOrderID` 1..n.
   - `toEventRows(drafts, startId=1000)` – giả lập insert DB (gán AccountingEventID).
 - `tests/engine/*.test.ts` – test engine thuần.
@@ -862,6 +870,7 @@ Dynamic params trong Next 16 là Promise: `(req, ctx: { params: Promise<{ id: st
   5. đổi cổng → chặn → Unpost ZENIROXPAY → Unbuild ONTARIO: dòng Stripe vẫn BUILT, import đổi ngày bị từ chối → Build + Post ONTARIO 501.40 / ZENIROXPAY 5,838.30;
   6. Post giữ 174 event chưa có ItemCodes (Build lại thì post bình thường) và 12 event trùng do phiên bản cũ tạo (sổ không đổi).
   7. event POSTED chưa có ItemCodes: import dòng sửa cùng đơn bị từ chối (gợi ý Build lại) → Build bổ sung ItemCodes → import được, không ghi trùng.
+- `tests/integration/seed.test.ts` – snapshot Company/Gateway ⇄ DB: DB mới nạp đúng file (mapping nào cũng trỏ tới Company có trong file); mở lại DB không đè dữ liệu sửa trên web; `upsertCompanySnapshot` đưa dòng trùng khóa về giá trị file, giữ dòng chỉ có trong DB; `writeCompanySnapshot` ra thư mục tạm đọc lại y hệt (dấu phẩy, ngoặc kép, ký tự ngoài ASCII); parse file sửa tay.
 - `tests/integration/flow.test.ts` – set `process.env.DATABASE_PATH` sang file tạm **trước khi** `await import(...)` các service (import tĩnh sẽ mở DB mặc định), chạy import → build → rebuild → post → export → chặn re-import → unpost → unbuild → build/post lại → Unpost+Unbuild theo kỳ; xóa file DB ở `afterAll`.
 
 ### 10.2 Baseline hồi quy (file order mẫu 64 dòng, master snapshot hiện tại)

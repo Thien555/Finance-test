@@ -20,6 +20,8 @@ describe("đổi mapping cổng thanh toán sau khi đã post", async () => {
   const { unpost } = await import("@/lib/services/clear");
   const { upsertGatewayMapping } = await import("@/lib/services/master");
   const { getDb, closeDb } = await import("@/lib/db/client");
+  const { seedTestCompanies } = await import("../helpers/fixtures");
+  seedTestCompanies(getDb());
 
   afterAll(() => {
     closeDb();

@@ -5,8 +5,7 @@ import { orderSourceId } from "@/lib/engine/keys";
 import type { MasterIndex } from "@/lib/engine/masters";
 import { reconcileEvents } from "@/lib/engine/reconcile-events";
 import type { EventDraft } from "@/lib/engine/types";
-import { DEFAULT_COMPANIES, DEFAULT_GATEWAY_MAPPINGS } from "@/lib/master/sources";
-import { loadIndex, loadMasters, loadSampleOrders, toEventRows } from "../helpers/fixtures";
+import { loadIndex, loadMasters, loadSampleOrders, TEST_COMPANIES, TEST_GATEWAY_MAPPINGS, toEventRows } from "../helpers/fixtures";
 
 const STRIPE = "ZeniroxPay - Stripe";
 const MAIN_ORDER = "QVAJV-191125-Q1Z3V";
@@ -23,8 +22,8 @@ type Mapping = { PaymentGatewayName: string; ComCode: string; IsActive: number }
 /** MasterIndex với GatewayCompanyMapping tùy biến (+ company NEWCO) */
 function indexWith(change: (mappings: Mapping[]) => Mapping[]): MasterIndex {
   return loadIndex({
-    gatewayMappings: change(DEFAULT_GATEWAY_MAPPINGS.map((g) => ({ ...g }))).map((g, i) => ({ ID: i + 1, ...g })),
-    companies: [...DEFAULT_COMPANIES, { ComCode: "NEWCO", CompanyName: "NewCo", FunctionalCurrency: "USD", IsActive: 1 }],
+    gatewayMappings: change(TEST_GATEWAY_MAPPINGS.map((g) => ({ ...g }))).map((g, i) => ({ ID: i + 1, ...g })),
+    companies: [...TEST_COMPANIES, { ComCode: "NEWCO", CompanyName: "NewCo", FunctionalCurrency: "USD", IsActive: 1 }],
   });
 }
 const remap = (name: string, comCode: string) => (ms: Mapping[]) => ms.map((m) => (m.PaymentGatewayName === name ? { ...m, ComCode: comCode } : m));

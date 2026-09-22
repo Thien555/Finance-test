@@ -1,12 +1,16 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type {
-  AccountingEventRow,
-  RawAccountingSourceRow,
-  RawOrderRow,
-  RawPaypalRow,
-  RawPipoRow,
-  RawStripeRow,
+import type { AppDb } from "@/lib/db/client";
+import {
+  type AccountingEventRow,
+  company,
+  type CompanyRow,
+  gatewayCompanyMapping,
+  type RawAccountingSourceRow,
+  type RawOrderRow,
+  type RawPaypalRow,
+  type RawPipoRow,
+  type RawStripeRow,
 } from "@/lib/db/schema";
 import type { EventDraft } from "@/lib/engine/types";
 import { MasterIndex, type Masters } from "@/lib/engine/masters";
@@ -19,7 +23,6 @@ import {
   parseJournalTypes,
   parsePartners,
 } from "@/lib/master/parse-master";
-import { DEFAULT_COMPANIES, DEFAULT_GATEWAY_MAPPINGS } from "@/lib/master/sources";
 import { canonicalHeaders, normalizeOrderRow } from "@/lib/orders/normalize";
 import { canonicalHeaderMap, SHEET_COLUMNS } from "@/lib/sources/columns";
 import {
@@ -32,6 +35,30 @@ import {
 const root = path.resolve(import.meta.dirname, "..", "..");
 const seed = (file: string) => readFileSync(path.join(root, "data", "seed", file), "utf8");
 
+/**
+ * Company & GatewayCompanyMapping cố định cho test, không lấy snapshot data/seed: 2 bảng đó sửa trên web
+ * (ONTARIO thật dùng CAD), còn các test đổi cổng cần ONTARIO cùng USD với ZENIROXPAY.
+ */
+export const TEST_COMPANIES: CompanyRow[] = [
+  { ComCode: "ZENIROXPAY", CompanyName: "ZeniroxPay Inc.", FunctionalCurrency: "USD", IsActive: 1 },
+  { ComCode: "ONTARIO", CompanyName: "Ontario", FunctionalCurrency: "USD", IsActive: 1 },
+];
+
+export const TEST_GATEWAY_MAPPINGS = [
+  { PaymentGatewayName: "ZeniroxPay Inc.", ComCode: "ZENIROXPAY", IsActive: 1 },
+  { PaymentGatewayName: "ZeniroxPay - Stripe", ComCode: "ZENIROXPAY", IsActive: 1 },
+];
+
+/** DB tạm của test integration: thay Company & GatewayCompanyMapping vừa seed từ snapshot bằng bộ cố định ở trên */
+export function seedTestCompanies(db: AppDb) {
+  db.transaction((tx) => {
+    tx.delete(gatewayCompanyMapping).run();
+    tx.delete(company).run();
+    tx.insert(company).values(TEST_COMPANIES).run();
+    tx.insert(gatewayCompanyMapping).values(TEST_GATEWAY_MAPPINGS).run();
+  });
+}
+
 export function loadMasters(): Masters {
   return {
     partners: parsePartners(seed("partners.csv")),
@@ -40,8 +67,8 @@ export function loadMasters(): Masters {
     coa: parseCoA(seed("coa.csv")),
     exrates: parseExrates(seed("exrate.csv")),
     bankMappings: parseBankMappings(seed("mapping-bank-account.csv")).map((m, i) => ({ ID: i + 1, ...m })),
-    companies: DEFAULT_COMPANIES,
-    gatewayMappings: DEFAULT_GATEWAY_MAPPINGS.map((g, i) => ({ ID: i + 1, ...g })),
+    companies: TEST_COMPANIES,
+    gatewayMappings: TEST_GATEWAY_MAPPINGS.map((g, i) => ({ ID: i + 1, ...g })),
   };
 }
 

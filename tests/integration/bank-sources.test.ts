@@ -18,7 +18,9 @@ describe("luồng nguồn ngoài Orders → GLTrans trên DB", async () => {
   const { runPost } = await import("@/lib/services/post");
   const { unpost, unbuild } = await import("@/lib/services/clear");
   const { listGl, listEvents, listExceptions } = await import("@/lib/services/queries");
-  const { closeDb } = await import("@/lib/db/client");
+  const { getDb, closeDb } = await import("@/lib/db/client");
+  const { seedTestCompanies } = await import("../helpers/fixtures");
+  seedTestCompanies(getDb());
 
   afterAll(() => {
     closeDb();

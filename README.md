@@ -12,7 +12,7 @@ npm install
 npm run dev          # http://localhost:3000
 ```
 
-Lần chạy đầu tự tạo DB và nạp master data từ `data/seed/*.csv` (snapshot Google Sheet).
+Lần chạy đầu tự tạo DB và nạp master data từ `data/seed/*.csv` (snapshot Google Sheet + Company/GatewayCompanyMapping sửa trên web).
 
 Thử nhanh: Dashboard → **Import file order mẫu** → **Chạy full cycle** → trang **4. GLTrans** → **Export Excel**.
 
@@ -20,7 +20,8 @@ Thử nhanh: Dashboard → **Import file order mẫu** → **Chạy full cycle**
 |---|---|
 | `npm test` | Unit test engine + test tích hợp cả luồng trên DB tạm |
 | `npm run db:reset` | Xóa file DB (lần chạy sau tạo lại) |
-| `npm run db:seed` | Nạp lại master data từ `data/seed` |
+| `npm run db:seed` | Nạp lại master data từ `data/seed` (Company/GatewayCompanyMapping: thêm/cập nhật, không xóa) |
+| `npm run db:export-seed` | Ghi Company/GatewayCompanyMapping trong DB ra `data/seed` để commit sang máy khác |
 | `npm run db:generate` | Sinh migration khi sửa `src/lib/db/schema.ts` |
 
 ## Luồng xử lý
@@ -81,7 +82,7 @@ Giải thích từng cột GLTrans có ở tooltip tiêu đề bảng và mục 
 ## Cấu trúc
 
 ```
-data/seed/            snapshot master data (partners, JournalType, JournalLineRule, CoA, Exrate, MappingBankAccount)
+data/seed/            snapshot master data (partners, JournalType, JournalLineRule, CoA, Exrate, MappingBankAccount, Company, GatewayCompanyMapping)
 data/samples/         file order mẫu (.csv/.xlsx) + mẫu GlTrans/AccountingEvent/PostingBatch để đối chiếu
 drizzle/              migration SQL
 src/lib/engine/       logic thuần (không đụng DB): parse, build-orders, post, resolve-partner, resolve-fx, keys
