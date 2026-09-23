@@ -48,6 +48,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 | API | §7 |
 | UI/antd | §8 |
 | Build PayPal/Stripe/PIPO/AccountingSource | §6.11 |
+| Một dòng sao kê PayPal/Stripe/PingPong ra Nợ/Có nào (có ví dụ, số liệu thật) | [`docs/MAPPING_PAYPAL_TO_GLTRANS.md`](docs/MAPPING_PAYPAL_TO_GLTRANS.md) · [`STRIPE`](docs/MAPPING_STRIPE_TO_GLTRANS.md) · [`PIPO`](docs/MAPPING_PIPO_TO_GLTRANS.md) |
 | Thêm nguồn dữ liệu thứ 5 | §11.1 |
 | Lỗi thường gặp, câu SQL soi dữ liệu | §12 |
 | Giả định, hạn chế, **bug đã biết chưa sửa** | §13 (bug: §13.3) |

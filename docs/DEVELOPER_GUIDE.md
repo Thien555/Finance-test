@@ -635,6 +635,12 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 
 Tài liệu gốc: §7.2 AccountingSource, §7.4 PayPal, §7.5 PIPO, §7.6 Stripe. Dữ liệu thật: `docs/tai-lieu-goc-and-data/Data-khac-order.xlsx` (5 sheet).
 
+> **Bản giải thích cho kế toán/BA, lần theo số liệu thật của file mẫu:**
+> [`MAPPING_PAYPAL_TO_GLTRANS.md`](MAPPING_PAYPAL_TO_GLTRANS.md) ·
+> [`MAPPING_STRIPE_TO_GLTRANS.md`](MAPPING_STRIPE_TO_GLTRANS.md) ·
+> [`MAPPING_PIPO_TO_GLTRANS.md`](MAPPING_PIPO_TO_GLTRANS.md).
+> Mục này là bản kỹ thuật; ba tài liệu kia có ví dụ từng dòng Nợ/Có và bảng cân đối của từng nguồn.
+
 **Post không phải sửa gì** — 4 nguồn này chỉ thêm tầng Import + Build.
 
 #### 6.11.1 Bản đồ nguồn → sheet → bảng
