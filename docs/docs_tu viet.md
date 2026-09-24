@@ -1,93 +1,41 @@
-AccountingEvent là bảng trung gian ghi lại: “Từ dữ liệu gốc này, cần ghi sổ những khoản gì, bao nhiêu tiền, cho ai?”
-Ví dụ một đơn hàng
-RawOrders chứa rất nhiều thông tin: sản phẩm, số lượng, địa chỉ, ngày giao, giá bán, phí ship, seller…
-Build đọc đơn đó và tạo 3 event:
-Event Khoản cần ghi nhận Số tiền
-1 Doanh thu tiền hàng 34.99
-2 Doanh thu ship và phụ phí 7.99
-3 Phần phải trả seller 19.32
+Tài liệu viết cho: kế toán/BA duyệt quy tắc, và AI/dev sẽ code bước tự điền.
 
-Mỗi event còn lưu công ty, ngày ghi sổ, tài khoản theo vai trò, partner và mã đơn gốc.
-Đến bước Post, hệ thống dùng các event này để sinh dòng Nợ/Có trong GLTrans.
-Tại sao cần bảng này?
+Tài liệu đã xong: docs/BA_PREFILL_SOURCES.md, một file gồm phần quy tắc chung và 4 phần PayPal, Stripe, PingPong, Orders. Không sửa dòng code nào; tôi cũng chưa commit.
 
-1. Kiểm tra trước khi ghi sổ
-   Ví dụ chưa tìm được seller thì event phần chia seller bị đánh dấu lỗi để xử lý.
-2. Giữ chi tiết khi GL đã gom tổng
-   GL có thể chỉ ghi doanh thu ngày hôm đó = 1,246.29 USD. AccountingEvent giữ chi tiết để biết tổng đó gồm những đơn nào, mỗi đơn đóng góp bao nhiêu.
-3. Theo dõi khoản nào đã ghi sổ
-   NEW là đang chờ; POSTED là đã ghi và có mã chứng từ để tra.
-Kết quả kiểm tra bút toán trên 55,112 order thật
-Tóm lại
-Engine ghi đúng theo quy tắc đang cấu hình. Một agent tự viết lại logic từ đầu (không đọc code engine) và đối soát từng dòng với kết quả của app:
+Mọi con số trong tài liệu được hai lần cài đặt độc lập chạy lại trên 4 file mẫu và khớp nhau. Sau đó có 2 vòng review, gồm một agent chỉ đọc tài liệu rồi thử code theo; mọi chỗ còn phải đoán đã được sửa.
 
-Tầng	Kết quả đối soát độc lập
-Import	55,111 / 55,111 dòng khớp 100% trên 15 cột kế toán
-AccountingEvent	129,221 event khớp tuyệt đối: số tiền, partner, TaxID, trạng thái
-GLTrans	3,178 chứng từ / 6,356 dòng khớp từng dòng; Σ Nợ = Σ Có = 3,479,338.74
-Khác	Mọi chứng từ cân; không seller nào bị gán nhầm mà không báo lỗi; không đơn test nào lọt vào sổ; không sai số làm tròn
-Nhưng sổ hiện tại chưa đúng và chưa đủ về mặt kế toán. Nguyên nhân không phải lỗi tính toán, mà là: thiếu master data, một số quy tắc nghiệp vụ không khớp với dữ liệu thật, dữ liệu nguồn có vấn đề, và 1 lỗi engine nguy hiểm cần sửa trước khi đổi mapping. GL mới phủ 85.7% doanh thu của các đơn FULFILLED.
+Công thức suy ra từ dữ liệu mẫu
 
-A. Chưa lên sổ vì thiếu master data
-1. 8 cổng thanh toán chưa map ComCode. 9,007 đơn FULFILLED bị bỏ ngoài sổ: doanh thu 381,293.42 và lợi nhuận seller 224,249.94. Không nên map hết về ZENIROXPAY: cột 47 không có tiêu đề trong file (chỉ có dữ liệu ở tháng 1/2026) gợi ý các cổng thuộc 2 nhóm pháp nhân khác nhau.
+Nguồn JournalType Partner Khớp mẫu
+PayPal Tra Description theo master (22 giá trị) Có Invoice ID → tìm đơn → seller. Mass Pay → supplier theo email. Rút tiền → Pingpong ZeniroxPay JournalType 142.658/142.659
+Stripe Bảng Type → mã (6 loại) storeId hoặc invoice → seller. Payout → Pingpong ZeniroxPay 1.413/1.413
+PingPong 6 quy tắc theo thứ tự (Type, From/To, Note) Mã store trong Note → seller. Khoản nhận về → đối chiếu với payout Stripe / lệnh rút PayPal 926/952; 26 dòng chờ điền tay
+Orders Giữ 4 mã như code hiện tại Tìm seller theo (email, mã store) 52.434/52.437 dòng có seller
+ComCode: lấy phần sau dấu \_ cuối của tên file, phải có trong bảng Company.
+Partner mới: cả 4 nguồn chỉ cần thêm 2 partner: seller VICBEA-Nattozyme và supplier treasury@freshworks.com.
+Chỗ tài liệu làm khác quy tắc bạn đưa ra, vì dữ liệu cho thấy làm đúng câu chữ sẽ sai
 
-Nhãn cột 47	Cổng	Dòng lỗi	TotalPrice
-fft (cùng nhóm với Inc./Stripe)	GA Key, GA 2	6,655	244,821.74
-vic (chỉ seller Vicbea)	Key, Vicbea-Stripe, Vicbea, ZeniroxPay #599	2,329	126,724.32
-messipay	ZeniroxPay #602	10	750.00
-không có nhãn	Koro, Mr.Oakly	13	753.22
-Nhóm Vicbea còn 2 vấn đề riêng. Profit của nhóm này không theo công thức chung (khoảng 1.05–1.07 lần, có đơn Profit −936.02). Tên partner dạng VICBEA-{Store} mà matcher không nhận, nên nếu map sẽ phát sinh 2,342 lỗi seller.
+PingPong Send không có chữ "payout": không gán hết là SUPPLIER. 13 dòng nạp thẻ MasterCard được xếp vào chuyển nội bộ. 26 dòng không có mã store (HUI, Vicbea) để trống kèm cờ cho kế toán điền tay. Làm đúng câu chữ sẽ sai 39 dòng.
+Mã store của PingPong: lấy chữ đứng ngay trước "payout", không lấy 3 ký tự đầu, vì cách 3 ký tự hỏng ở MS007. Bettamax chưa có tích hợp, nên tạm tra Partners master: ra đúng 143/143 mã.
+Chuyển nội bộ về PingPong: không tách được PayPal với Stripe chỉ bằng From/To, vì hai bên ghi giống nhau. Phải đối chiếu số tiền với payout Stripe và lệnh rút PayPal, kết quả khớp 84/84.
+PayPal không có Invoice ID: chỉ nhánh Mass Pay mới tra/thêm supplier theo email.
+Theo các lựa chọn bạn đã chốt, tài liệu ghi rõ số dòng lệch với file mẫu:
 
-2. Seller thiếu trong Partners. 12 seller mới (onboard từ 3–4/2026) chưa có trong Partners: 480 event, 13,870.66. Thêm 2 seller có cả FFT-FFT ACZ/HBC và FFT-OLD ACZ/HBC: 46 event, 964.87, cần bạn chọn store. Hệ quả: 526 đơn đã ghi doanh thu nhưng thiếu chi phí seller, làm lãi gộp bị thổi phồng 14,835.53 (76% rơi vào 202604).
+PartnerCode: dùng email store thay vì email nhận payout như file mẫu, nên lệch 34.640 dòng PayPal và 408 dòng PingPong.
+StoreName: ghi tên đầy đủ (FFT NAC, Lausan), trong khi mẫu ghi tên rút gọn và gộp cả nhóm Vicbea thành Vicbea.
+Phát hiện quan trọng
 
-B. Quy tắc nghiệp vụ lệch với dữ liệu thật (cần bạn chốt)
-3. Doanh thu = Quantity × UnitPrice, trong khi Profit seller tính trên TotalPrice.
+2.388 lỗi thiếu partner của Orders: chỉ 3 là thiếu partner thật. 2.385 lỗi còn lại do hàm so tên store: không nhận tiền tố VICBEA-, và bắt nhầm các store FFT-OLD. Phải sửa hàm này trước khi cho tự thêm partner, nếu không sẽ sinh partner trùng.
+Partner tự thêm sẽ mất khi bấm Sync master, vì Sync xóa rồi nạp lại toàn bộ Partners. Mặc định trong tài liệu: xuất danh sách đề xuất → dán lên Google Sheet → Sync.
+File order export chưa có cột mã store (idStore). Cột TaxID hiện có là mã thuế người mua tự gõ, không dùng được.
+Tên file mẫu Bank_Paypal.csv sẽ ra ComCode là PAYPAL, không phải mã công ty. File thô cần đặt tên theo dạng Paypal_ZENIROXPAY.csv.
+File khác đã sửa (chỉ tài liệu)
 
-931 đơn có TotalPrice ≠ Q×U + Ship, lệch ròng +37,797.66. 816 đơn TotalPrice cao hơn: mua thêm hoặc upsell mà Quantity không ghi. 115 đơn thấp hơn: giảm giá khi mua nhiều.
-Hậu quả: 624 đơn có chi phí seller lớn hơn doanh thu đã ghi sổ. Ví dụ 15196-191125-PVXFS ghi doanh thu 59.99 + 4.99 nhưng TotalPrice 199.96 và Profit 99.49.
-4. AdditionalCost (836 đơn quốc tế, 4,000.00). Khách không trả khoản này: nó không nằm trong TotalPrice, và thuế Canada cũng không tính trên nó. Khoản này đã được trừ vào Profit seller, nhưng engine vẫn ghi Nợ 13122001 / Có 51131001, tức ghi thừa 4,000. Tài liệu MAPPING của bạn từng cảnh báo điểm này; nay đã xác nhận trên dữ liệu thật.
+CLAUDE.md: thêm 1 dòng link tới tài liệu mới.
+DEVELOPER_GUIDE.md: thêm link ở §6.11, và thêm 3 bug phát hiện được vào §13.3 (#18–#20).
+§9 còn 20 câu hỏi mở cho kế toán, mỗi câu kèm giá trị mặc định tài liệu đang dùng. Các câu cần chốt sớm nhất:
 
-5. Extra Fee (133 đơn). Profit trống nên engine coi là 0: 2,352 ghi vào 51112001, không trả seller, và chỉ báo INFO. Cần chốt đây là doanh thu của công ty hay phải trả seller.
-
-6. Cột TaxID trên order thực ra là mã thuế của người mua (RFC Mexico, hoặc người mua gõ "No", "Norway"...). Engine lại dùng cột này làm ưu tiên số 1 để tìm seller, nên có rủi ro khớp nhầm partner như TAX hay PAYPAL. Hiện ảnh hưởng 0 USD.
-
-C. Dữ liệu nguồn
-7. File là các bản chụp theo tháng, trạng thái bị "đóng băng" lúc export.
-
-2,673 đơn UNFULFILLED. Riêng đơn trả tiền 29–31/01/2026 thì 100% UNFULFILLED, gần như chắc đã giao sau đó nhưng chưa bao giờ được ghi doanh thu (phần thuộc ZENIROXPAY: 71,243.85). → Cần export lại.
-Không có đơn nào trả tiền từ 27/11 đến 04/12/2025, ước tính thiếu khoảng 2,000 đơn.
-8. Múi giờ. FulfilledAt lệch khoảng 8 giờ so với LastUpdatedAt. 159 đơn (11,706.36) nằm ở ranh giới tháng, có thể đang vào nhầm kỳ. Cần chốt múi giờ ghi sổ.
-
-9. Các lỗi nhỏ:
-
-Dòng 27342 là mảnh rời có Profit −12.99, bị bỏ qua.
-#MS0091001 FULFILLED nhưng thiếu ngày và Quantity.
-48 đơn Canada không có thuế.
-56 nhóm nghi khách thanh toán trùng (2,715.07).
-Cột 47/48 không có tiêu đề bị bỏ qua mà không cảnh báo.
-D. Lỗi engine và vận hành
-10. ⚠️ Lỗi nghiêm trọng: ghi sổ trùng. Nếu đổi GatewayCompanyMapping của một cổng đã post, lần Build sau tạo event mới dưới ComCode mới, trong khi event cũ vẫn POSTED. Không có cảnh báo nào. Mô phỏng đổi "ZeniroxPay - Stripe" sang ONTARIO: 495 đơn bị ghi trùng, 35,801.60. Tôi đã đối chiếu với code build.ts và xác nhận đúng: khóa event có chứa ComCode, và event POSTED không bị đụng tới. Vì vậy chưa được đổi mapping của cổng đã post cho tới khi sửa lỗi này.
-
-11. Không khóa kỳ. Khi bổ sung mapping, 24,668 event (520,562.08) sẽ được ghi lùi vào 6 kỳ đã qua, và 196 PostingGroupKey bị tách thành 2 chứng từ.
-
-12. Bộ nhớ. Import file 20MB cần khoảng 2.3–2.7GB RAM. Nếu heap Node chỉ 1GB thì server Next.js chết hẳn: lỗi hết bộ nhớ của Node không bắt được bằng try/catch.
-
-Về mức độ kiểm chứng: các phát hiện A–C và mục 12 đều đã có người phản biện chạy lại độc lập. Mục 10–11 do agent rà soát cuối mô phỏng trên bản sao DB; riêng mục 10 tôi đã tự đối chiếu thêm với code.
-
-Đề xuất thứ tự xử lý
-Việc tôi làm được ngay, không cần chờ quyết định nghiệp vụ:
-Sửa lỗi ghi trùng khi đổi mapping (mục 10).
-Cho importer cảnh báo cột không tiêu đề, thiếu Quantity, Profit trống.
-Bỏ ưu tiên cột TaxID khi tìm seller.
-Đọc Excel dạng stream để giảm RAM.
-Tất cả kèm test.
-Việc bạn và kế toán cần chốt:
-Map 8 cổng về ComCode nào (dùng bảng nhãn fft/vic ở mục 1).
-Doanh thu tính theo TotalPrice hay Q×U.
-Cách xử lý AdditionalCost và Extra Fee.
-Múi giờ ghi sổ.
-Store FFT-OLD.
-Dữ liệu: xin export lại các tháng với trạng thái hiện tại, gồm cả khoảng 27/11–04/12/2025; cập nhật sheet Partners.
-Bạn muốn tôi làm bước 1 luôn không? Tôi cũng có thể viết toàn bộ 45 phát hiện ra một file báo cáo chi tiết. File đó chứa email seller và số tiền thật, nên tôi sẽ để ngoài git.
-
-Kết quả đầy đủ của workflow đang ở scratchpad (real/audit-result.json), cùng DB tạm real/full.db chứa dữ liệu thật. Nhắc lại: nên thêm docs/full-order.xlsx vào .gitignore.
+charge của Stripe ghi mã STRIPE_CHARGE (theo tài liệu gốc) hay STRIPE_RECEIPT_CUSTOMER (theo file mẫu, mã này chỉ có trong seed)?
+Tên cột mã store sẽ thêm vào file order export.
+Store ACZ/HBC thuộc FFT-FFT hay FFT-OLD.
+26 dòng PingPong không có mã store trả cho seller nào.

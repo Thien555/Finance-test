@@ -50,6 +50,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 | UI/antd | §8 |
 | Build PayPal/Stripe/PIPO | §6.11 |
 | Một dòng sao kê PayPal/Stripe/PingPong ra Nợ/Có nào (có ví dụ, số liệu thật) | [`docs/MAPPING_PAYPAL_TO_GLTRANS.md`](docs/MAPPING_PAYPAL_TO_GLTRANS.md) · [`STRIPE`](docs/MAPPING_STRIPE_TO_GLTRANS.md) · [`PIPO`](docs/MAPPING_PIPO_TO_GLTRANS.md) |
+| Điền trước `JournalType`/`StoreName`/`PartnerCode`/`PartnerTaxID`/`ComCode` cho file sao kê thô, tự đề xuất partner thiếu (PREFILL, **chưa code**) | [`docs/BA_PREFILL_SOURCES.md`](docs/BA_PREFILL_SOURCES.md) |
 | Thêm nguồn dữ liệu mới | §11.1 |
 | Lỗi thường gặp, câu SQL soi dữ liệu | §12 |
 | Giả định, hạn chế, **bug đã biết chưa sửa** | §13 (bug: §13.3) |

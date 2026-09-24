@@ -640,6 +640,8 @@ Tài liệu gốc: §7.4 PayPal, §7.5 PIPO, §7.6 Stripe. Dữ liệu thật: `
 > [`MAPPING_STRIPE_TO_GLTRANS.md`](MAPPING_STRIPE_TO_GLTRANS.md) ·
 > [`MAPPING_PIPO_TO_GLTRANS.md`](MAPPING_PIPO_TO_GLTRANS.md).
 > Mục này là bản kỹ thuật; ba tài liệu kia có ví dụ từng dòng Nợ/Có và bảng cân đối của từng nguồn.
+>
+> **Các cột điền tay** (`JournalType`, `StoreName`, `PartnerCode`, `ComCode`) được điền theo công thức nào, và đặc tả bước tự điền PREFILL (chưa code): [`BA_PREFILL_SOURCES.md`](BA_PREFILL_SOURCES.md).
 
 **Post không phải sửa gì** — 3 nguồn này chỉ thêm tầng Import + Build.
 
@@ -1079,6 +1081,9 @@ Phát hiện khi rà soát tài liệu với code. Khi sửa, thêm test tái hi
 | 15 | Tiến trình bị kill giữa Build/Post → `BuildBatch`/`PostingBatch` kẹt `RUNNING` mãi (dữ liệu vẫn rollback đúng) | `src/lib/services/build.ts`, `src/lib/services/post.ts` | Đánh dấu batch RUNNING cũ là FAILED khi khởi động |
 | 16 | Export Excel toàn bộ AccountingEvent (156k dòng) mất 4–5 phút, RSS tới ~7.8GB | `src/lib/services/export.ts` | Dùng ExcelJS streaming writer hoặc CSV |
 | 17 | Dòng `FULFILLED` nhưng trống `FulfilledAt` chỉ bị bỏ qua với exception INFO `NOT_FULFILLED` (lẫn trong hàng nghìn dòng UNFULFILLED bình thường) | `src/lib/engine/build-orders.ts` | Tách mức WARNING/ERROR riêng cho FULFILLED thiếu ngày |
+| 18 | `storeNameMatches` không nhận tiền tố `VICBEA-` (`Lausan` ≠ `VICBEA-Lausan`) và dùng `endsWith(" " + store)` nên `ACZ` khớp nhầm cả `FFT-OLD ACZ`. Hệ quả: 2.385/2.388 event `MISSING_PARTNER` của Orders là do so tên, không phải thiếu partner. Ở nguồn ngân hàng, `resolvePartnerByCode` khi mơ hồ chỉ cảnh báo WARNING `MISSING_PARTNER` (`…|AMBIGUOUS`, gom nhóm) rồi **vẫn ghi sổ với partner đầu tiên có TaxID**, có thể sai store. Vd store Lausan của `vicbeamanager@gmail.com` ra `FFT-PMH-InfluencePick` | `src/lib/engine/resolve-partner.ts` | So bằng tuyệt đối sau khi bỏ `^(FFT\|WFF\|VICBEA\|MESI PAY)-` ở PartnerName và `FFT ` đầu ở cả hai phía — xem [`BA_PREFILL_SOURCES.md`](BA_PREFILL_SOURCES.md) §2.5, §6.3 |
+| 19 | `resolveSeller` bước 1 tra cột `TaxID` của order trên **mọi loại** partner, nhưng cột này là mã thuế người mua tự gõ (13/55.111 dòng, vd `Norway`, `I dont have one`); người mua gõ `TAX`/`PAYPAL` sẽ khớp nhầm partner OTHER. Nhánh lỗi còn ghi `PartnerTaxID = TaxID người mua` lên event | `src/lib/engine/resolve-partner.ts`, `src/lib/engine/build-orders.ts` | Bỏ bước này; thay bằng mã store (`StoreId`) khi export có cột đó, chỉ tra trong partner loại Seller |
+| 20 | Dòng master `PP_PROTECTION_BONUS_PAYOUT` có tên gốc gộp 3 mô tả ngăn bằng dấu phẩy, `jtByNativeType` dùng nguyên chuỗi làm khóa nên fallback theo `Description` không bao giờ khớp mã này | `src/lib/engine/masters.ts` | Tách alias theo `,` và trim từng phần |
 
 ---
 
