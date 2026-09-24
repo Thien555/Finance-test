@@ -5,12 +5,7 @@
  * (`JournalType`, `PartnerCode`, `StoreName`, các cột tài khoản). Nhờ vậy sửa tay rồi import lại
  * sẽ đổi `RowHash` nhưng giữ nguyên `SourceKey` → tầng Import chặn được đúng dòng đã build/post.
  */
-import type {
-  RawAccountingSourceInsert,
-  RawPaypalInsert,
-  RawPipoInsert,
-  RawStripeInsert,
-} from "@/lib/db/schema";
+import type { RawPaypalInsert, RawPipoInsert, RawStripeInsert } from "@/lib/db/schema";
 import { sha256 } from "@/lib/engine/keys";
 import { parseDate, parseDateTime, parseNumber, parseTimeOfDay, toText } from "@/lib/engine/parse";
 import { canonicalHeaderMap, type SourceColumn } from "./columns";
@@ -211,88 +206,6 @@ export function normalizePipoRow(
       StoreName: str(v.StoreName),
       PartnerCode: str(v.PartnerCode),
       BankAccoutNumber: str(v.BankAccoutNumber),
-    },
-  };
-}
-
-// ──────────────────────── AccountingSource ────────────────────────
-
-/** Sheet "Master Card" không có cột ContraAccount; 39/39 dòng là nhận tiền từ PingPong */
-export const MASTER_CARD_DEFAULT_CONTRA = "11202061";
-/** Sheet "Master Card" không có cột BalanceImpact; mọi dòng là BANK_INTERNAL_TRANSFER_FROM (tiền vào) */
-export const MASTER_CARD_DEFAULT_BALANCE_IMPACT = "Credit";
-
-/**
- * `Amount` trên 2 sheet luôn dương; chiều tiền nằm ở `BalanceImpact` theo quy ước sao kê ngân hàng:
- * `Debit` = tiền **ra** khỏi tài khoản → số âm; `Credit` = tiền **vào** → số dương.
- * Rule `NegativeMode = REVERSE` sẽ tự đảo Nợ/Có khi số âm.
- */
-export function signedAmount(amount: number | null, balanceImpact: string | null): number | null {
-  if (amount === null) return null;
-  const magnitude = Math.abs(amount);
-  return (balanceImpact ?? "").trim().toUpperCase() === "DEBIT" ? -magnitude : magnitude;
-}
-
-export function normalizeAccountingSourceRow(
-  record: Record<string, unknown>,
-  headerMap: Map<string, string>,
-  columns: SourceColumn[],
-  sheetName: string,
-  /** Đếm số lần xuất hiện của cùng một nội dung trong file — Bank_Royal có dòng trùng y hệt */
-  seen: Map<string, number>,
-): NormalizeResult<Omit<RawAccountingSourceInsert, "RawAccountingSourceID" | "ImportBatchID">> {
-  const v = projectRow(record, headerMap, columns);
-  const isMasterCard = sheetName === "Master Card";
-  const comCode = str(v.Comcode);
-  const date = dayOf(v.Date);
-  const rawAmount = num(v.Amount);
-  const idTransaction = str(v["ID Transaction"]);
-  const key = idTransaction ?? str(v.RefNum);
-
-  if (!comCode) return { ok: false, key, error: "Thiếu Comcode" };
-  if (!date) return { ok: false, key, error: `Cột Date không đọc được ngày: "${str(v.Date) ?? ""}"` };
-  if (rawAmount === null) return { ok: false, key, error: "Thiếu Amount" };
-
-  const balanceImpact = str(v.BalanceImpact) ?? (isMasterCard ? MASTER_CARD_DEFAULT_BALANCE_IMPACT : null);
-
-  // Khóa dòng: mã giao dịch nếu có; Bank_Royal không có RefNum nào nên hash phần nhận dạng của dòng
-  // (cố ý KHÔNG gồm JournalType / các cột tài khoản / BalanceImpact — đó là phần người dùng điền tay).
-  let sourceKey: string;
-  if (idTransaction) {
-    sourceKey = `MC|${idTransaction}`;
-  } else {
-    const identity = sha256([sheetName, comCode, str(v.BankAccountNumber), date, rawAmount, str(v.InputCurr), str(v.PartnerCode)]).slice(0, 32);
-    const n = (seen.get(identity) ?? 0) + 1;
-    seen.set(identity, n);
-    sourceKey = `RB|${identity}#${n}`;
-  }
-
-  return {
-    ok: true,
-    row: {
-      SourceKey: sourceKey,
-      ComCode: comCode.toUpperCase(),
-      PostingDate: date,
-      BuildStatus: "NOT_BUILT",
-      BuildMessage: null,
-      RowHash: sha256([sheetName, v]),
-      SheetName: sheetName,
-      BankAccountNumber: str(v.BankAccountNumber),
-      JournalType: str(v.JournalType),
-      PartnerCode: str(v.PartnerCode),
-      Date: date,
-      IDTransaction: idTransaction,
-      Amount: signedAmount(rawAmount, balanceImpact),
-      Currency: str(v.Currency)?.toUpperCase() ?? null,
-      InputCurr: str(v.InputCurr)?.toUpperCase() ?? null,
-      Description: str(v.Description),
-      BalanceImpact: balanceImpact,
-      RefNum: str(v.RefNum),
-      Segment: str(v.Segment),
-      IsPosted: str(v.IsPosted),
-      BankAccount: str(v.BankAccount),
-      ContraAccount: str(v.ContraAccount) ?? (isMasterCard ? MASTER_CARD_DEFAULT_CONTRA : null),
-      TransAccount: str(v.TransAccount),
     },
   };
 }

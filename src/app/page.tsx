@@ -1,6 +1,6 @@
 "use client";
 
-import { DeleteOutlined, FileAddOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { DeleteOutlined, ThunderboltOutlined } from "@ant-design/icons";
 import { App, Button, Card, Col, Collapse, Popconfirm, Row, Space, Statistic, Steps, Table, Tag, Typography } from "antd";
 import Link from "next/link";
 import { useState } from "react";
@@ -94,15 +94,6 @@ export default function DashboardPage() {
           ]}
         />
         <Space wrap style={{ marginTop: 20 }}>
-          <Button
-            icon={<FileAddOutlined />}
-            loading={busy === "sample"}
-            onClick={() =>
-              run("sample", () => postJson("/api/orders/import-sample"), (r: { InsertedRows: number; SkippedRows: number }) => `Import file mẫu: thêm ${r.InsertedRows}, bỏ qua ${r.SkippedRows}`)
-            }
-          >
-            Import file order mẫu
-          </Button>
           <Button
             type="primary"
             icon={<ThunderboltOutlined />}

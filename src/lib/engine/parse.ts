@@ -81,15 +81,24 @@ function fromExcelDate(d: Date) {
   );
 }
 
+/** Serial Excel → dayjs (25569 = 1970-01-01 tính theo mốc 1899-12-30 của Excel) */
+function fromExcelSerial(serial: number) {
+  return fromExcelDate(new Date(Math.round((serial - 25569) * 86400 * 1000)));
+}
+
+/**
+ * Ô ngày xuất ra .csv từ sheet không định dạng ngày cho chuỗi toàn số (VD "46023.43107").
+ * 5–6 chữ số = serial Excel (1927–4637), không đụng năm 4 chữ số nên không mơ hồ với "2025".
+ * Thiếu nhánh này thì `dayjs("46023.43107")` fallback lỏng ra **năm 4602** mà không báo lỗi.
+ */
+const EXCEL_SERIAL = /^\d{5,6}(\.\d+)?$/;
+
 function toDayjs(v: unknown): dayjs.Dayjs | null {
   if (isBlank(v)) return null;
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : fromExcelDate(v);
-  if (typeof v === "number") {
-    // Excel serial date
-    const ms = Math.round((v - 25569) * 86400 * 1000);
-    return fromExcelDate(new Date(ms));
-  }
+  if (typeof v === "number") return fromExcelSerial(v);
   const s = String(v).trim();
+  if (EXCEL_SERIAL.test(s)) return fromExcelSerial(Number(s));
   const d = dayjs(s, DATE_FORMATS, true);
   if (d.isValid()) return d;
   const iso = dayjs(s);

@@ -1,9 +1,9 @@
 "use client";
 
-import { FileAddOutlined, InboxOutlined, ReloadOutlined } from "@ant-design/icons";
+import { InboxOutlined, ReloadOutlined } from "@ant-design/icons";
 import { App, Button, Card, Descriptions, Input, Select, Space, Table, Tabs, Typography, Upload } from "antd";
 import { useMemo, useState } from "react";
-import { postJson, toQuery, useApi, useOptions } from "@/components/client";
+import { toQuery, useApi, useOptions } from "@/components/client";
 import { columnsOf, StatusTag } from "@/components/ui";
 import type { ImportBatchRow, RawOrderRow } from "@/lib/db/schema";
 import { ORDER_COLUMNS } from "@/lib/orders/columns";
@@ -80,18 +80,6 @@ export default function RawOrdersPage() {
     await Promise.all([orders.reload(), batches.reload()]);
   };
 
-  const importSample = async () => {
-    setUploading(true);
-    try {
-      showResult(await postJson<ImportOrdersResult>("/api/orders/import-sample"));
-      await refresh();
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
-    }
-  };
-
   return (
     <Space orientation="vertical" size={16} style={{ width: "100%" }}>
       <div>
@@ -99,7 +87,7 @@ export default function RawOrdersPage() {
           1. Raw Orders
         </Typography.Title>
         <Typography.Text type="secondary">
-          Upload file order thô (.csv hoặc .xlsx, header giống sheet order mẫu). Mỗi dòng = 1 item, khóa theo ItemCode. Import lại cùng file sẽ bỏ qua dòng
+          Upload file order thô (.csv hoặc .xlsx, header giống sheet Orders). Mỗi dòng = 1 item, khóa theo ItemCode. Import lại cùng file sẽ bỏ qua dòng
           không đổi.
         </Typography.Text>
       </div>
@@ -135,11 +123,6 @@ export default function RawOrdersPage() {
           <p className="ant-upload-text">{uploading ? "Đang import..." : "Kéo thả hoặc bấm để chọn file order (.csv / .xlsx)"}</p>
           <p className="ant-upload-hint">Cột bắt buộc: OrderId, ItemCode, ItemStatus, Quantity, UnitPrice, PaymentGatewayName</p>
         </Upload.Dragger>
-        <Space style={{ marginTop: 12 }}>
-          <Button icon={<FileAddOutlined />} onClick={importSample} loading={uploading}>
-            Import file order mẫu (64 dòng)
-          </Button>
-        </Space>
       </Card>
 
       <Card>

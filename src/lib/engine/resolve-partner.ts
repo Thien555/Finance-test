@@ -41,7 +41,7 @@ export interface CodeResolveResult {
 }
 
 /**
- * Partner lấy thẳng từ cột PartnerCode trên nguồn (tài liệu §7.2 bước 4 — AccountingSource/PayPal/PIPO/Stripe).
+ * Partner lấy thẳng từ cột PartnerCode trên nguồn (tài liệu §7.2 bước 4 — PayPal/PIPO/Stripe).
  * Khác `resolveSeller`: nguồn ngân hàng/PSP đã ghi sẵn mã đối tượng (VD "RoyalBank", "Paypal ZeniroxPay",
  * hoặc email seller), không suy từ TaxID trên dòng. 1 email seller có nhiều store thì lọc tiếp bằng StoreName.
  * Không có trong Partners vẫn ghi sổ với mã đó nhưng `matched = false` → build ghi cảnh báo

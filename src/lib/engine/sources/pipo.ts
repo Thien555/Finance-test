@@ -2,7 +2,7 @@
  * Spec nguồn PIPO / PingPong (tài liệu §7.5). Sheet `Bank_Pipo` của Data-khac-order.xlsx.
  *
  *  - Chỉ xử lý `Status = Success` (§7.5 bước 2). File còn trạng thái `Retrieved` → bỏ qua + exception INFO.
- *  - File điền sẵn các mã `BANK_*` vốn thuộc `DataSource = AccountingSource`. Master đã được bổ sung
+ *  - File điền sẵn các mã `BANK_*` vốn khai cho `DataSource = AccountingSource` trong Google Sheet. Master đã được bổ sung
  *    10 dòng `DataSource = PIPO` dùng lại đúng các mã đó nhưng `BankAccount = 11202061` (PingPong)
  *    thay vì `11202001` (Bank CA). JournalLineRule khóa theo JournalTypeCode nên dùng chung rule sẵn có.
  *  - Cột `Amount`, `Fee`, `Net` là **text có đuôi tiền tệ** (`"1.01USD"`, `"100.00USD"`) → `parseNumber` bóc phần số.

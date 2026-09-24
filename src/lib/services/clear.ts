@@ -208,7 +208,6 @@ export function resetTransactionalData() {
     "RawPaypal",
     "RawStripe",
     "RawPipo",
-    "RawAccountingSource",
     "ImportBatch",
   ];
   sqlite.transaction(() => {

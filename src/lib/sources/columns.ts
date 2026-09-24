@@ -7,7 +7,7 @@ export type ColumnKind = "text" | "number" | "date" | "datetime" | "time";
 export type SourceColumn = [name: string, kind: ColumnKind];
 
 /** Mã nguồn dùng trên URL/API/AccountingEvent.DataSource */
-export const SOURCE_KEYS = ["paypal", "stripe", "pipo", "accounting-source"] as const;
+export const SOURCE_KEYS = ["paypal", "stripe", "pipo"] as const;
 export type SourceKey = (typeof SOURCE_KEYS)[number];
 
 export const PAYPAL_COLUMNS: SourceColumn[] = [
@@ -92,37 +92,6 @@ export const PIPO_COLUMNS: SourceColumn[] = [
 ];
 export const PIPO_REQUIRED = ["Time", "Amount", "TransactionId", "Currency", "Status", "ComCode"];
 
-export const MASTER_CARD_COLUMNS: SourceColumn[] = [
-  ["Comcode", "text"],
-  ["BankAccountNumber", "text"],
-  ["JournalType", "text"],
-  ["PartnerCode", "text"],
-  ["Date", "date"],
-  ["ID Transaction", "text"],
-  ["Amount", "number"],
-  ["Currency", "text"],
-];
-export const MASTER_CARD_REQUIRED = ["Comcode", "JournalType", "Date", "Amount"];
-
-export const BANK_ROYAL_COLUMNS: SourceColumn[] = [
-  ["Comcode", "text"],
-  ["BankAccountNumber", "text"],
-  ["JournalType", "text"],
-  ["Date", "date"],
-  ["PartnerCode", "text"],
-  ["InputCurr", "text"],
-  ["Amount", "number"],
-  ["Description", "text"],
-  ["BalanceImpact", "text"],
-  ["RefNum", "text"],
-  ["Segment", "text"],
-  ["IsPosted", "text"],
-  ["BankAccount", "text"],
-  ["ContraAccount", "text"],
-  ["TransAccount", "text"],
-];
-export const BANK_ROYAL_REQUIRED = ["Comcode", "JournalType", "Date", "Amount", "BalanceImpact"];
-
 /** Header trong file so khớp theo dạng đã bỏ hoa thường + mọi khoảng trắng ("Time Zone" ≡ "timezone") */
 const canon = (h: string) => h.trim().toLowerCase().replace(/\s+/g, "");
 
@@ -147,8 +116,8 @@ export interface SourceMeta {
   /** AccountingEvent.DataSource */
   dataSource: string;
   label: string;
-  /** Sheet mặc định trong Data-khac-order.xlsx */
-  sheets: string[];
+  /** Tên sheet trong workbook nhiều nguồn (.xlsx); file .csv tách riêng thì bỏ qua */
+  sheet: string;
   columns: SourceColumn[];
   required: string[];
   /** Cột hiển thị đầu bảng trên trang raw */
@@ -160,7 +129,7 @@ export const SOURCE_META: Record<SourceKey, SourceMeta> = {
     key: "paypal",
     dataSource: "PAYPAL",
     label: "PayPal",
-    sheets: ["Bank_Paypal"],
+    sheet: "Bank_Paypal",
     columns: PAYPAL_COLUMNS,
     required: PAYPAL_REQUIRED,
     primary: ["Date", "Transaction ID", "Description", "JournalType", "Gross", "Fee", "PartnerCode", "StoreName"],
@@ -169,7 +138,7 @@ export const SOURCE_META: Record<SourceKey, SourceMeta> = {
     key: "stripe",
     dataSource: "STRIPE",
     label: "Stripe",
-    sheets: ["Bank_Stripe"],
+    sheet: "Bank_Stripe",
     columns: STRIPE_COLUMNS,
     required: STRIPE_REQUIRED,
     primary: ["Date", "id", "Type", "JournalType", "Amount", "Fee", "PartnerCode", "StoreName"],
@@ -178,27 +147,9 @@ export const SOURCE_META: Record<SourceKey, SourceMeta> = {
     key: "pipo",
     dataSource: "PIPO",
     label: "PIPO / PingPong",
-    sheets: ["Bank_Pipo"],
+    sheet: "Bank_Pipo",
     columns: PIPO_COLUMNS,
     required: PIPO_REQUIRED,
     primary: ["Time", "TransactionId", "Type", "Status", "JournalType", "Amount", "PartnerCode", "StoreName"],
   },
-  "accounting-source": {
-    key: "accounting-source",
-    dataSource: "ACCOUNTINGSOURCE",
-    label: "AccountingSource (Master Card + Bank Royal)",
-    sheets: ["Master Card", "Bank_Royal"],
-    // Hợp của 2 sheet; normalize chọn đúng bộ cột theo sheet đang import
-    columns: [...BANK_ROYAL_COLUMNS, ["ID Transaction", "text"], ["Currency", "text"]],
-    required: MASTER_CARD_REQUIRED,
-    primary: ["SheetName", "Date", "JournalType", "PartnerCode", "Amount", "BalanceImpact", "ContraAccount", "TransAccount"],
-  },
-};
-
-export const SHEET_COLUMNS: Record<string, { columns: SourceColumn[]; required: string[] }> = {
-  Bank_Paypal: { columns: PAYPAL_COLUMNS, required: PAYPAL_REQUIRED },
-  Bank_Stripe: { columns: STRIPE_COLUMNS, required: STRIPE_REQUIRED },
-  Bank_Pipo: { columns: PIPO_COLUMNS, required: PIPO_REQUIRED },
-  "Master Card": { columns: MASTER_CARD_COLUMNS, required: MASTER_CARD_REQUIRED },
-  Bank_Royal: { columns: BANK_ROYAL_COLUMNS, required: BANK_ROYAL_REQUIRED },
 };

@@ -127,7 +127,7 @@ export default function EventsPage() {
         </Typography.Title>
         <Typography.Text type="secondary">
           Build chuyển dòng raw thành event chuẩn hóa (chưa tách Nợ/Có, chưa ghi sổ). Orders: mỗi đơn fulfilled → tối đa 4 event (PRODUCT, SHIPADD,
-          TAX, SELLER_PROFIT). PayPal/Stripe/PIPO/AccountingSource: mỗi dòng raw → 1 event cho mỗi JournalLineRule active. Chọn nguồn ở ô
+          TAX, SELLER_PROFIT). PayPal/Stripe/PIPO: mỗi dòng raw → 1 event cho mỗi JournalLineRule active. Chọn nguồn ở ô
           &quot;Nguồn&quot; rồi bấm Build; để trống là Orders. Bấm 1 dòng để xem chi tiết &amp; truy vết.
         </Typography.Text>
       </div>

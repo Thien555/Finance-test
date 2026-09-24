@@ -9,24 +9,11 @@
  */
 import { eq, inArray } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
-import {
-  importBatch,
-  rawAccountingSource,
-  rawPaypal,
-  rawPipo,
-  rawStripe,
-} from "@/lib/db/schema";
-import { BadRequestError } from "@/lib/errors";
+import { importBatch, rawPaypal, rawPipo, rawStripe } from "@/lib/db/schema";
 import { nowIso } from "@/lib/engine/parse";
 import { readTable } from "@/lib/io/read-table";
-import { canonicalHeaderMap, SHEET_COLUMNS, SOURCE_META, type SourceKey } from "@/lib/sources/columns";
-import {
-  normalizeAccountingSourceRow,
-  normalizePaypalRow,
-  normalizePipoRow,
-  normalizeStripeRow,
-  type NormalizeResult,
-} from "@/lib/sources/normalize";
+import { canonicalHeaderMap, SOURCE_META, type SourceKey } from "@/lib/sources/columns";
+import { normalizePaypalRow, normalizePipoRow, normalizeStripeRow, type NormalizeResult } from "@/lib/sources/normalize";
 import { chunk, type DbOrTx } from "./common";
 
 export interface ImportRowError {
@@ -53,7 +40,7 @@ type RawShape = { SourceKey: string; RowHash: string };
 type ExistingRow = { id: number; RowHash: string; BuildStatus: string };
 
 interface SourceAdapter<T extends RawShape> {
-  normalize(record: Record<string, unknown>, map: Map<string, string>, sheet: string, seen: Map<string, number>): NormalizeResult<T>;
+  normalize(record: Record<string, unknown>, map: Map<string, string>): NormalizeResult<T>;
   loadExisting(keys: string[]): Map<string, ExistingRow>;
   insert(tx: DbOrTx, values: T & { ImportBatchID: number }): void;
   update(tx: DbOrTx, id: number, values: T & { ImportBatchID: number }): void;
@@ -70,7 +57,7 @@ function adapterOf(source: SourceKey): SourceAdapter<RawShape> {
   switch (source) {
     case "paypal":
       return {
-        normalize: (record, map, sheet) => normalizePaypalRow(record, map, SHEET_COLUMNS[sheet].columns),
+        normalize: (record, map) => normalizePaypalRow(record, map, SOURCE_META.paypal.columns),
         loadExisting: (keys) => {
           const out = new Map<string, ExistingRow>();
           for (const c of chunk(keys, 500)) {
@@ -92,7 +79,7 @@ function adapterOf(source: SourceKey): SourceAdapter<RawShape> {
       } as SourceAdapter<RawShape>;
     case "stripe":
       return {
-        normalize: (record, map, sheet) => normalizeStripeRow(record, map, SHEET_COLUMNS[sheet].columns),
+        normalize: (record, map) => normalizeStripeRow(record, map, SOURCE_META.stripe.columns),
         loadExisting: (keys) => {
           const out = new Map<string, ExistingRow>();
           for (const c of chunk(keys, 500)) {
@@ -114,7 +101,7 @@ function adapterOf(source: SourceKey): SourceAdapter<RawShape> {
       } as SourceAdapter<RawShape>;
     case "pipo":
       return {
-        normalize: (record, map, sheet) => normalizePipoRow(record, map, SHEET_COLUMNS[sheet].columns),
+        normalize: (record, map) => normalizePipoRow(record, map, SOURCE_META.pipo.columns),
         loadExisting: (keys) => {
           const out = new Map<string, ExistingRow>();
           for (const c of chunk(keys, 500)) {
@@ -134,56 +121,19 @@ function adapterOf(source: SourceKey): SourceAdapter<RawShape> {
         insert: (tx, values) => tx.insert(rawPipo).values(values as never).run(),
         update: (tx, id, values) => tx.update(rawPipo).set(values as never).where(eq(rawPipo.RawPipoID, id)).run(),
       } as SourceAdapter<RawShape>;
-    case "accounting-source":
-      return {
-        normalize: (record, map, sheet, seen) => normalizeAccountingSourceRow(record, map, SHEET_COLUMNS[sheet].columns, sheet, seen),
-        loadExisting: (keys) => {
-          const out = new Map<string, ExistingRow>();
-          for (const c of chunk(keys, 500)) {
-            for (const [k, v] of collect(
-              db
-                .select({
-                  SourceKey: rawAccountingSource.SourceKey,
-                  RowHash: rawAccountingSource.RowHash,
-                  BuildStatus: rawAccountingSource.BuildStatus,
-                  id: rawAccountingSource.RawAccountingSourceID,
-                })
-                .from(rawAccountingSource)
-                .where(inArray(rawAccountingSource.SourceKey, c))
-                .all(),
-              (r) => r.id,
-            )) {
-              out.set(k, v);
-            }
-          }
-          return out;
-        },
-        insert: (tx, values) => tx.insert(rawAccountingSource).values(values as never).run(),
-        update: (tx, id, values) =>
-          tx.update(rawAccountingSource).set(values as never).where(eq(rawAccountingSource.RawAccountingSourceID, id)).run(),
-      } as SourceAdapter<RawShape>;
   }
 }
 
-export async function importSourceFile(
-  source: SourceKey,
-  buffer: Buffer,
-  fileName: string,
-  sheetName?: string | null,
-): Promise<ImportSourceResult> {
+export async function importSourceFile(source: SourceKey, buffer: Buffer, fileName: string): Promise<ImportSourceResult> {
   const meta = SOURCE_META[source];
-  const sheet = sheetName?.trim() || meta.sheets[0];
-  if (!meta.sheets.includes(sheet)) {
-    throw new BadRequestError(`Nguồn ${meta.label} chỉ nhận sheet: ${meta.sheets.join(", ")} (đang chọn "${sheet}")`);
-  }
-  const spec = SHEET_COLUMNS[sheet];
+  const sheet = meta.sheet;
   const adapter = adapterOf(source);
   const db = getDb();
   const uploadedAt = nowIso();
 
   // .csv chỉ có 1 bảng nên bỏ qua sheetName; .xlsx thì lấy đúng sheet theo tên
   const table = await readTable(buffer, fileName, { sheetName: fileName.toLowerCase().endsWith(".xlsx") ? sheet : undefined });
-  const { map, missing } = canonicalHeaderMap(table.headers, spec.columns, spec.required);
+  const { map, missing } = canonicalHeaderMap(table.headers, meta.columns, meta.required);
 
   if (missing.length > 0) {
     const message = `Sheet "${sheet}" thiếu cột bắt buộc: ${missing.join(", ")}`;
@@ -215,8 +165,7 @@ export async function importSourceFile(
   }
 
   const errors: ImportRowError[] = [];
-  const seen = new Map<string, number>();
-  const normalized = table.records.map((record, i) => ({ rowNumber: i + 2, result: adapter.normalize(record, map, sheet, seen) }));
+  const normalized = table.records.map((record, i) => ({ rowNumber: i + 2, result: adapter.normalize(record, map) }));
   const existing = adapter.loadExisting(normalized.flatMap((n) => (n.result.ok ? [n.result.row.SourceKey] : [])));
 
   let inserted = 0;

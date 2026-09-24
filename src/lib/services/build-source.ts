@@ -1,5 +1,5 @@
 /**
- * (2) BUILD các nguồn ngoài Orders: RawPaypal / RawStripe / RawPipo / RawAccountingSource → AccountingEvent.
+ * (2) BUILD các nguồn ngoài Orders: RawPaypal / RawStripe / RawPipo → AccountingEvent.
  *
  * Khác Orders ở chỗ 1 dòng raw ⇄ 1 bộ event (khóa `SourceID` ổn định), không có khái niệm "build trọn đơn":
  *  - Draft = mọi dòng raw trong phạm vi (ComCode + kỳ theo `PostingDate`)
@@ -10,20 +10,11 @@
 import { and, count, eq, gte, inArray, lte, ne, type SQL } from "drizzle-orm";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { getDb } from "@/lib/db/client";
-import {
-  type AccountingEventRow,
-  accountingEvent,
-  buildBatch,
-  rawAccountingSource,
-  rawPaypal,
-  rawPipo,
-  rawStripe,
-} from "@/lib/db/schema";
+import { type AccountingEventRow, accountingEvent, buildBatch, rawPaypal, rawPipo, rawStripe } from "@/lib/db/schema";
 import { type BankSourceSpec, buildBankEvents } from "@/lib/engine/build-bank";
 import { bankSourceId } from "@/lib/engine/keys";
 import { nowIso } from "@/lib/engine/parse";
 import { reconcileEvents } from "@/lib/engine/reconcile-events";
-import { accountingSourceSpec } from "@/lib/engine/sources/accounting-source";
 import { paypalSpec } from "@/lib/engine/sources/paypal";
 import { pipoSpec } from "@/lib/engine/sources/pipo";
 import { stripeSpec } from "@/lib/engine/sources/stripe";
@@ -137,37 +128,6 @@ const builders = {
         .where(and(ne(rawPipo.BuildStatus, "NOT_BUILT"), ...periodWhere(rawPipo, scope)))
         .all()[0].n,
   } satisfies SourceBuilder<typeof rawPipo.$inferSelect>,
-  "accounting-source": {
-    spec: accountingSourceSpec,
-    loadRows: (db, scope) => {
-      const w = periodWhere(rawAccountingSource, scope);
-      return db
-        .select()
-        .from(rawAccountingSource)
-        .where(w.length ? and(...w) : undefined)
-        .all();
-    },
-    setStatus: (tx, id, status, message, comCode) =>
-      tx
-        .update(rawAccountingSource)
-        .set({ BuildStatus: status, BuildMessage: message, ComCode: comCode })
-        .where(eq(rawAccountingSource.RawAccountingSourceID, id))
-        .run(),
-    resetAll: (tx, scope) => {
-      const w = periodWhere(rawAccountingSource, scope);
-      tx
-        .update(rawAccountingSource)
-        .set({ BuildStatus: "NOT_BUILT", BuildMessage: null })
-        .where(w.length ? and(...w) : undefined)
-        .run();
-    },
-    countBuilt: (db, scope) =>
-      db
-        .select({ n: count() })
-        .from(rawAccountingSource)
-        .where(and(ne(rawAccountingSource.BuildStatus, "NOT_BUILT"), ...periodWhere(rawAccountingSource, scope)))
-        .all()[0].n,
-  } satisfies SourceBuilder<typeof rawAccountingSource.$inferSelect>,
 };
 
 /** Mỗi entry đã được `satisfies SourceBuilder<Row>` kiểm ở trên; chỗ dùng chung chỉ cần hình dạng chung */
@@ -177,7 +137,6 @@ export const SOURCE_DATA_SOURCES: Record<SourceKey, string> = {
   paypal: paypalSpec.dataSource,
   stripe: stripeSpec.dataSource,
   pipo: pipoSpec.dataSource,
-  "accounting-source": accountingSourceSpec.dataSource,
 };
 
 /** Reset BuildStatus của bảng raw theo nguồn — dùng khi Unbuild */

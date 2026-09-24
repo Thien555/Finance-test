@@ -31,7 +31,7 @@
 
 Toàn bộ số liệu **không phải số minh họa tự nghĩ ra**. Chúng được tạo bằng cách chạy đúng code của repo trên một database SQLite trống:
 
-1. `importOrders(data/samples/orders-sample.csv)`: import file order mẫu (64 dòng).
+1. `importOrders(data/samples/orders-sample.csv)`: import file order mẫu 64 dòng — **file này đã gỡ khỏi repo**, số liệu dưới đây giữ nguyên làm ví dụ đã kiểm chứng. Baseline hiện tại (toàn bộ `order-data.csv`) xem `docs/DEVELOPER_GUIDE.md` §10.2.
 2. `runBuildOrders()`: build toàn bộ, không giới hạn phạm vi.
 3. `runPost("All")`: post Single rồi Bulk.
 4. Master data: snapshot `data/seed/*.csv`, kể cả Company và GatewayCompanyMapping (`company.csv`, `gateway-company-mapping.csv`).
@@ -350,7 +350,7 @@ Xem bảng ở [1.3](#13-sáu-tài-khoản-mà-luồng-orders-dùng-lấy-từ-b
 ## Phần 4 — Bước 1: Import (file → RawOrders)
 
 **Code:** `src/lib/services/import-orders.ts`, `src/lib/io/read-table.ts`, `src/lib/orders/normalize.ts`, `src/lib/orders/columns.ts`, `src/lib/engine/parse.ts`.
-**Trên web:** trang **1. Raw Orders** → kéo file vào, hoặc bấm "Import file order mẫu".
+**Trên web:** trang **1. Raw Orders** → kéo file vào.
 
 ### 4.1. Đọc file
 
@@ -1527,10 +1527,10 @@ Exception POST SourceKey = "EventID " + AccountingEventID + " | " + TransactionI
 
 ### 14.1. Tái tạo trên web
 
-1. Tắt dev server, chạy `npm run db:reset` (xóa DB), rồi `npm run dev`.
-2. Dashboard → **Import file order mẫu** → **Chạy full cycle**.
-3. Trang **4. GLTrans** phải hiện: 42 dòng, 21 chứng từ, Σ Nợ = Σ Có = 6,339.70.
-4. Lọc DocNum `ASB-20251121-106`, click dòng → Drawer có 23 event, trong đó có `ORD-QVAJV-191125-Q1Z3V-20251121`.
+1. Tắt dev server, chạy `npm run db:clear` (xóa dữ liệu giao dịch, giữ master), rồi `npm run dev`.
+2. Trang **1. Raw Orders** → kéo thả `data/samples/order-data.csv` → Dashboard **Chạy full cycle**.
+3. Trang **4. GLTrans** phải hiện: 6.794 dòng, 3.397 chứng từ, Σ Nợ = Σ Có = 4.013.848,04.
+4. Lọc DocNum của đơn `QVAJV-191125-Q1Z3V`, click dòng → Drawer liệt kê các event của chứng từ đó.
 
 ### 14.2. Câu SQL soi dữ liệu
 

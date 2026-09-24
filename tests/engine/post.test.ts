@@ -7,10 +7,11 @@ import { loadIndex, loadMasters, loadSampleOrders, toEventRows } from "../helper
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a.plus(b), new Decimal(0)).toNumber();
 
-describe("Post Bulk trên event build từ order mẫu", async () => {
+describe("Post Bulk trên event build từ toàn bộ file order thật", async () => {
   const index = loadIndex();
   const build = buildOrderEvents(await loadSampleOrders(), index);
-  const events = toEventRows(build.events);
+  // Giống runPost: chỉ post event NEW, bỏ 2.388 event ERROR từ bước Build (seller ngoài Partners)
+  const events = toEventRows(build.events).filter((e) => e.PostStatus === "NEW");
   const result = postEvents(events, "Bulk", index);
   const gl = result.glLines;
 
@@ -18,17 +19,18 @@ describe("Post Bulk trên event build từ order mẫu", async () => {
     expect(events.every((e) => classifyOf(index, e) === "Bulk")).toBe(true);
   });
 
-  it("21 group → 42 dòng GLTrans, 174 event POSTED", () => {
-    expect(result.docCount).toBe(21);
-    expect(gl).toHaveLength(42);
-    expect(result.posted).toHaveLength(174);
+  it("3.397 chứng từ → 6.794 dòng GLTrans, 153.845 event POSTED", () => {
+    expect(result.docCount).toBe(3_397);
+    expect(gl).toHaveLength(6_794);
+    expect(result.posted).toHaveLength(153_845);
     expect(result.failed).toHaveLength(0);
+    expect(events).toHaveLength(result.posted.length);
   });
 
-  it("tổng Nợ = tổng Có = 6,339.70", () => {
-    expect(sum(gl.map((l) => l.AccountedDr ?? 0))).toBe(6339.7);
-    expect(sum(gl.map((l) => l.AccountedCr ?? 0))).toBe(6339.7);
-    expect(sum(gl.map((l) => l.InputDr ?? 0))).toBe(6339.7);
+  it("tổng Nợ = tổng Có = 4.013.848,04", () => {
+    expect(sum(gl.map((l) => l.AccountedDr ?? 0))).toBe(4_013_848.04);
+    expect(sum(gl.map((l) => l.AccountedCr ?? 0))).toBe(4_013_848.04);
+    expect(sum(gl.map((l) => l.InputDr ?? 0))).toBe(4_013_848.04);
   });
 
   it("group ngày 20/11/2025 đúng số tiền và bút toán", () => {
@@ -57,13 +59,16 @@ describe("Post Bulk trên event build từ order mẫu", async () => {
     const minId = Math.min(...groupEvents.map((e) => e.AccountingEventID));
     expect(l.DocNum).toBe(`ASB-20251120-${minId}`);
     expect(l).toMatchObject({ ComCode: "ZENIROXPAY", Period: "202511", XRate: 1, RateType: "MUL", PartnerTaxID: "VA4ZH4IIFMUTCFCXF1GY" });
+    expect(groupEvents).toHaveLength(11);
     expect(l.Description).toBe(`Orders Fulfilled Seller Profit Bulk | CONTRA_TRANS | ${groupEvents.length} events`);
   });
 });
 
 describe("Post Single + NegativeMode + FX (dữ liệu giả)", async () => {
   const masters = loadMasters();
-  const base = toEventRows(buildOrderEvents((await loadSampleOrders()).slice(1, 2), loadIndex()).events)[0];
+  // Neo vào 1 đơn fulfilled cụ thể thay vì vị trí dòng — file thật có dòng đầu UNFULFILLED
+  const anchor = (await loadSampleOrders()).filter((r) => r.OrderId === "MTUBV-181125-51MRR");
+  const base = toEventRows(buildOrderEvents(anchor, loadIndex()).events)[0];
 
   /** Tạo 1 JournalType Single + 1 rule tùy biến để test */
   function setup(rule: Partial<JournalLineRuleRow>) {

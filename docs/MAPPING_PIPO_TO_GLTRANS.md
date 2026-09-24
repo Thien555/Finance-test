@@ -1,7 +1,7 @@
 # PingPong (PIPO): sao kê thô → RawPipo → AccountingEvent → GLTrans
 
 > Giải thích **một dòng sao kê PingPong biến thành những dòng Nợ/Có nào, và vì sao**. Số liệu trong tài
-> liệu do chính code của repo sinh ra trên `data/samples/pipo-sample.csv`.
+> liệu do chính code của repo sinh ra trên `pipo-sample.csv` — bản trích 36 dòng của file thật, **đã gỡ khỏi repo**. Cách ánh xạ dưới đây không đổi; tổng số hiện tại của cả file xem `docs/DEVELOPER_GUIDE.md` §10.2.
 >
 > - Kiến thức kế toán cơ bản (Nợ/Có, loại tài khoản, chứng từ): [`MAPPING_ORDERS_TO_GLTRANS.md` Phần 1](MAPPING_ORDERS_TO_GLTRANS.md#phần-1--kiến-thức-kế-toán-tối-thiểu).
 > - Chi tiết kỹ thuật: [`DEVELOPER_GUIDE.md` §6.11](DEVELOPER_GUIDE.md). Yêu cầu gốc: `tai lieu du an.md` §7.5.
@@ -147,8 +147,9 @@ Tất cả đều có `BankAccount = 11202061`, `FeeAccount = 64200020`, `Partne
 | `BANK_RECEIPT_OTHER` | Thu khác | `13889001` | – |
 | `BANK_BANK_FEE` | Phí ngân hàng đứng riêng | `33111002` | `64200020` |
 
-> ⚠️ **Mười mã này dùng chung `JournalTypeCode` với `DataSource = AccountingSource`** (sheet Bank_Royal),
-> chỉ khác `BankAccount`: PIPO dùng `11202061` (PingPong), AccountingSource dùng `11202001` (Bank CA).
+> ⚠️ **Mười mã này dùng chung `JournalTypeCode` với `DataSource = AccountingSource`** (khai trong Google Sheet,
+> không còn nguồn nào import). `JournalLineRule` chỉ có **một** bộ rule `BANK_*` phục vụ cả hai và được tra
+> theo `JournalTypeCode` **không kèm DataSource** — xóa các dòng đó khỏi master là PIPO mất sạch event.
 > Vì `JournalLineRule` khóa theo `JournalTypeCode` **mà không có `DataSource`**, hai nguồn dùng chung
 > đúng một bộ rule.
 >

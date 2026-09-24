@@ -21,11 +21,7 @@ const DOCS: Record<string, string> = {
   JournalType: "Cột bạn điền tay. Đây là JournalTypeCode và được ưu tiên; để trống thì engine suy từ loại giao dịch gốc.",
   PartnerCode: "Cột bạn điền tay. Dùng khi JournalType có Partner = From Source.",
   ComCode: "Cột bạn điền tay trên file. Phải có trong bảng Company.",
-  BalanceImpact: "Debit = tiền ra khỏi tài khoản (Amount ghi âm); Credit = tiền vào (Amount ghi dương).",
   BankAccoutNumber: "Giữ đúng tên cột của sheet (thiếu chữ n). Để trống thì dùng tài khoản mặc định của nguồn.",
-  ContraAccount: "Tài khoản đối ứng ghi thẳng trên dòng — thắng mặc định của JournalType.",
-  TransAccount: "Tài khoản trung gian ghi thẳng trên dòng — thắng mặc định của JournalType.",
-  SheetName: "Sheet gốc của dòng: Master Card hoặc Bank_Royal.",
 };
 
 export default function RawSourcePage() {
@@ -42,7 +38,6 @@ function RawSource({ source }: { source: SourceKey }) {
   const { data: options } = useOptions();
   const [filter, setFilter] = useState<{ search?: string; comCode?: string; buildStatus?: string; journalType?: string }>({});
   const [page, setPage] = useState({ page: 1, pageSize: 50 });
-  const [sheet, setSheet] = useState(meta.sheets[0]);
   const [uploading, setUploading] = useState(false);
 
   const raw = useApi<{ rows: Record<string, unknown>[]; total: number; journalTypes: string[] }>(
@@ -52,9 +47,9 @@ function RawSource({ source }: { source: SourceKey }) {
 
   const fields = useMemo(() => {
     const sheetCols = meta.columns.map(([n]) => n);
-    const known = new Set([...ADMIN_FIELDS, ...sheetCols, "SheetName"]);
+    const known = new Set([...ADMIN_FIELDS, ...sheetCols]);
     const primary = meta.primary.filter((n) => known.has(n));
-    const rest = [...ADMIN_FIELDS, "SheetName", ...sheetCols].filter((n) => !primary.includes(n));
+    const rest = [...ADMIN_FIELDS, ...sheetCols].filter((n) => !primary.includes(n));
     return [...primary, ...new Set(rest)];
   }, [meta]);
 
@@ -111,7 +106,7 @@ function RawSource({ source }: { source: SourceKey }) {
           Raw {meta.label}
         </Typography.Title>
         <Typography.Text type="secondary">
-          Upload sheet <b>{meta.sheets.join(" / ")}</b> của file Data-khac-order.xlsx (hoặc .csv tách riêng). DataSource ghi sổ:{" "}
+          Upload sheet <b>{meta.sheet}</b> của file Data-khac-order.xlsx (hoặc .csv tách riêng). DataSource ghi sổ:{" "}
           <b>{meta.dataSource}</b>.
         </Typography.Text>
       </div>
@@ -124,12 +119,6 @@ function RawSource({ source }: { source: SourceKey }) {
       />
 
       <Card>
-        {meta.sheets.length > 1 && (
-          <Space style={{ marginBottom: 12 }}>
-            <span>Sheet:</span>
-            <Select value={sheet} style={{ width: 200 }} onChange={setSheet} options={meta.sheets.map((s) => ({ value: s, label: s }))} />
-          </Space>
-        )}
         <Upload.Dragger
           accept=".csv,.xlsx"
           multiple={false}
@@ -140,7 +129,6 @@ function RawSource({ source }: { source: SourceKey }) {
             try {
               const form = new FormData();
               form.append("file", file as File);
-              form.append("sheet", sheet);
               const res = await fetch(`/api/sources/${source}/import`, { method: "POST", body: form });
               const data = await res.json();
               if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
@@ -158,7 +146,7 @@ function RawSource({ source }: { source: SourceKey }) {
           <p className="ant-upload-drag-icon">
             <InboxOutlined />
           </p>
-          <p className="ant-upload-text">{uploading ? "Đang import..." : `Kéo thả hoặc bấm để chọn file — sẽ đọc sheet "${sheet}"`}</p>
+          <p className="ant-upload-text">{uploading ? "Đang import..." : `Kéo thả hoặc bấm để chọn file — sẽ đọc sheet "${meta.sheet}"`}</p>
           <p className="ant-upload-hint">Cột bắt buộc: {meta.required.join(", ")}</p>
         </Upload.Dragger>
       </Card>

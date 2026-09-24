@@ -1,5 +1,5 @@
 /**
- * BUILD nguồn ngân hàng / PSP: 1 dòng raw → N AccountingEvent (tài liệu §7.2 AccountingSource, §7.4 PayPal,
+ * BUILD nguồn ngân hàng / PSP: 1 dòng raw → N AccountingEvent (tài liệu §7.4 PayPal,
  * §7.5 PIPO, §7.6 Stripe).
  *
  * Bốn nguồn có cùng hình dạng nên dùng chung engine này; phần khác nhau nằm trong `BankSourceSpec`
@@ -54,7 +54,7 @@ export interface BankSourceSpec<R> {
   sourceKey(row: R): string;
   /**
    * Mã giao dịch gốc ghi lên event/GL (`ReferenceTxnID`, đuôi `Description`). Trống thì dùng `sourceKey`
-   * (Bank_Royal không có RefNum). Khóa event đã gồm JournalTypeCode nên mã trùng ở 2 nghiệp vụ khác nhau vẫn hợp lệ.
+   * (nguồn không có cột mã giao dịch). Khóa event đã gồm JournalTypeCode nên mã trùng ở 2 nghiệp vụ khác nhau vẫn hợp lệ.
    */
   transactionId(row: R): string | null;
   accept(row: R): AcceptResult;
@@ -69,7 +69,10 @@ export interface BankSourceSpec<R> {
   inputCurr(row: R): string | null;
   amounts(row: R, journalTypeCode: string): BankAmounts;
   bankAccountNumber(row: R): string | null;
-  /** Tài khoản ghi thẳng trên dòng nguồn (Bank_Royal có sẵn 3 TK) — thắng mọi nguồn khác */
+  /**
+   * Điểm mở rộng: nguồn nào ghi sẵn tài khoản trên từng dòng thì trả ở đây — thắng mọi mặc định khác.
+   * 3 nguồn hiện tại đều trả `{}`; giữ lại theo guide §11.1 bước 5.
+   */
   accountOverrides(row: R): Partial<BankAccounts>;
   partnerCode(row: R): string | null;
   storeName(row: R): string | null;

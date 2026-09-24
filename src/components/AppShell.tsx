@@ -24,7 +24,6 @@ const MENU = [
   { key: "/raw/paypal", icon: <CloudUploadOutlined />, label: "1b. Raw PayPal" },
   { key: "/raw/stripe", icon: <CloudUploadOutlined />, label: "1c. Raw Stripe" },
   { key: "/raw/pipo", icon: <CloudUploadOutlined />, label: "1d. Raw PIPO" },
-  { key: "/raw/accounting-source", icon: <CloudUploadOutlined />, label: "1e. Raw AccountingSource" },
   { key: "/events", icon: <NodeIndexOutlined />, label: "2. AccountingEvent (Build)" },
   { key: "/posting", icon: <SendOutlined />, label: "3. Posting (PostingBatch)" },
   { key: "/gl", icon: <BookOutlined />, label: "4. GLTrans (Sổ cái)" },

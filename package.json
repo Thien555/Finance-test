@@ -3,16 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=12288 next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "cross-env NODE_OPTIONS=--max-old-space-size=12288 next start",
     "lint": "eslint",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "cross-env NODE_OPTIONS=--max-old-space-size=12288 vitest run",
+    "test:watch": "cross-env NODE_OPTIONS=--max-old-space-size=12288 vitest",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx scripts/seed.ts",
     "db:export-seed": "tsx scripts/export-seed.ts",
-    "db:reset": "tsx scripts/reset-db.ts"
+    "db:reset": "tsx scripts/reset-db.ts",
+    "db:clear": "tsx scripts/clear-db.ts",
+    "audit": "cross-env NODE_OPTIONS=--max-old-space-size=12288 tsx scripts/audit-sources.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.4",
@@ -34,6 +36,7 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.5",

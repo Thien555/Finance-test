@@ -188,7 +188,7 @@ export const rawOrders = sqliteTable(
 );
 
 /**
- * Cột chung của mọi bảng raw nguồn ngân hàng/PSP (PayPal, Stripe, PIPO, AccountingSource).
+ * Cột chung của mọi bảng raw nguồn ngân hàng/PSP (PayPal, Stripe, PIPO).
  *  - SourceKey  : khóa định danh dòng, duy nhất trong bảng (xem src/lib/<source>/normalize.ts)
  *  - PostingDate: ngày ghi sổ đã chuẩn hóa YYYY-MM-DD, dùng để lọc theo kỳ khi Build
  *  - ComCode    : lấy thẳng từ cột ComCode trên file (khác Orders — Orders suy ra từ PaymentGatewayName)
@@ -299,34 +299,6 @@ export const rawPipo = sqliteTable(
     BankAccoutNumber: text("BankAccoutNumber"),
   },
   (t) => [index("IX_RawPipo_Posting").on(t.PostingDate), index("IX_RawPipo_Txn").on(t.TransactionId)],
-);
-
-/** Hợp của 2 sheet "Master Card" và "Bank_Royal" — cả hai đều dùng JournalType của DataSource = AccountingSource */
-export const rawAccountingSource = sqliteTable(
-  "RawAccountingSource",
-  {
-    RawAccountingSourceID: integer("RawAccountingSourceID").primaryKey({ autoIncrement: true }),
-    ...bankRawColumns(),
-    /** Tên sheet nguồn: "Master Card" | "Bank_Royal" */
-    SheetName: text("SheetName").notNull(),
-    BankAccountNumber: text("BankAccountNumber"),
-    JournalType: text("JournalType"),
-    PartnerCode: text("PartnerCode"),
-    Date: text("Date"),
-    IDTransaction: text("ID Transaction"),
-    Amount: real("Amount"),
-    Currency: text("Currency"),
-    InputCurr: text("InputCurr"),
-    Description: text("Description"),
-    BalanceImpact: text("BalanceImpact"), // Debit | Credit (chiều tiền trên sao kê)
-    RefNum: text("RefNum"),
-    Segment: text("Segment"),
-    IsPosted: text("IsPosted"),
-    BankAccount: text("BankAccount"),
-    ContraAccount: text("ContraAccount"),
-    TransAccount: text("TransAccount"),
-  },
-  (t) => [index("IX_RawAccountingSource_Posting").on(t.PostingDate), index("IX_RawAccountingSource_Sheet").on(t.SheetName)],
 );
 
 // ───────────────────────────── Engine ─────────────────────────────
@@ -502,8 +474,6 @@ export type RawStripeRow = typeof rawStripe.$inferSelect;
 export type RawStripeInsert = typeof rawStripe.$inferInsert;
 export type RawPipoRow = typeof rawPipo.$inferSelect;
 export type RawPipoInsert = typeof rawPipo.$inferInsert;
-export type RawAccountingSourceRow = typeof rawAccountingSource.$inferSelect;
-export type RawAccountingSourceInsert = typeof rawAccountingSource.$inferInsert;
 export type BuildBatchRow = typeof buildBatch.$inferSelect;
 export type AccountingEventRow = typeof accountingEvent.$inferSelect;
 export type AccountingEventInsert = typeof accountingEvent.$inferInsert;

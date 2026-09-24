@@ -14,7 +14,7 @@ npm run dev          # http://localhost:3000
 
 Lần chạy đầu tự tạo DB và nạp master data từ `data/seed/*.csv` (snapshot Google Sheet + Company/GatewayCompanyMapping sửa trên web).
 
-Thử nhanh: Dashboard → **Import file order mẫu** → **Chạy full cycle** → trang **4. GLTrans** → **Export Excel**.
+Thử nhanh: trang **1. Raw Orders** → kéo thả `data/samples/order-data.csv` → Dashboard **Chạy full cycle** → trang **4. GLTrans** → **Export Excel**.
 
 | Lệnh | Tác dụng |
 |---|---|
@@ -61,9 +61,9 @@ Join rule theo `JournalTypeCode + RuleSeq = EventSeq` → TK theo `NormalDr/CrAc
 
 Giải thích từng cột GLTrans có ở tooltip tiêu đề bảng và mục "Giải nghĩa các cột GLTrans" trên trang GL (`src/lib/field-docs.ts`).
 
-### Kết quả mong đợi với file order mẫu (64 dòng)
+### Kết quả mong đợi với `data/samples/order-data.csv` (55.112 dòng)
 
-60 dòng fulfilled → **174 event** (60 PRODUCT + 58 SHIPADD + 56 SELLER_PROFIT) → Post Bulk **21 chứng từ / 42 dòng GL**, tổng Nợ = tổng Có = **6,339.70**.
+52.437 dòng fulfilled → **156.233 event** (52.437 PRODUCT + 51.309 SHIPADD + 52.304 SELLER_PROFIT + 183 TAX) → Post Bulk **3.397 chứng từ / 6.794 dòng GL**, tổng Nợ = tổng Có = **4.013.848,04**. Chi tiết và baseline 3 nguồn còn lại: `docs/DEVELOPER_GUIDE.md` §10.2.
 
 ### Điều chỉnh
 
@@ -83,7 +83,7 @@ Giải thích từng cột GLTrans có ở tooltip tiêu đề bảng và mục 
 
 ```
 data/seed/            snapshot master data (partners, JournalType, JournalLineRule, CoA, Exrate, MappingBankAccount, Company, GatewayCompanyMapping)
-data/samples/         file order mẫu (.csv/.xlsx) + mẫu GlTrans/AccountingEvent/PostingBatch để đối chiếu
+data/samples/         4 file dữ liệu thật (order-data, Bank_Paypal, Bank_Stripe, Bank_Pipo) + mẫu GlTrans/AccountingEvent/PostingBatch để đối chiếu
 drizzle/              migration SQL
 src/lib/engine/       logic thuần (không đụng DB): parse, build-orders, post, resolve-partner, resolve-fx, keys
 src/lib/services/     điều phối DB: import, build, post, unpost/unbuild, query, export, master sync

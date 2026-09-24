@@ -8,10 +8,9 @@
  *  6. Chốt chặn lúc Post: event chưa có ItemCodes, event trùng tạo từ phiên bản cũ.
  *  7. Event POSTED chưa có ItemCodes: import dòng sửa cùng đơn → Build bổ sung ItemCodes → import được.
  */
-import { readFileSync, rmSync } from "node:fs";
+import { rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import Papa from "papaparse";
 import { afterAll, describe, expect, it } from "vitest";
 
 const dbFile = path.join(os.tmpdir(), `finance-guards-${process.pid}-${Date.now()}.db`);
@@ -19,9 +18,13 @@ process.env.DATABASE_PATH = dbFile;
 
 const STRIPE = "ZeniroxPay - Stripe";
 const MAIN_ORDER = "QVAJV-191125-Q1Z3V";
-const sampleText = readFileSync(path.join(process.cwd(), "data", "samples", "orders-sample.csv"), "utf8").replace(/^﻿/, "");
-const sampleRecords = Papa.parse<Record<string, string>>(sampleText, { header: true, skipEmptyLines: "greedy" }).data;
-const toCsv = (records: Record<string, string>[]) => Buffer.from(Papa.unparse(records), "utf8");
+/** Số event của tập con kịch bản (431 dòng, thuần kỳ 202511) và phần thuộc cổng Stripe */
+const SCENARIO_FREE_DAY = "2025-11-30";
+const EVENTS = 1_205;
+const STRIPE_EVENTS = 123;
+const GL_TOTAL = 43_227.58;
+/** Tổng sổ khi đơn mốc bị tách thêm 1 item qua cổng thứ hai */
+const GL_TOTAL_SPLIT = 43_289.88;
 
 describe("chặn ghi sổ trùng qua các đường khác", async () => {
   const { importOrders } = await import("@/lib/services/import-orders");
@@ -30,8 +33,12 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
   const { unpost, unbuild, resetTransactionalData } = await import("@/lib/services/clear");
   const { upsertGatewayMapping, deleteGatewayMapping } = await import("@/lib/services/master");
   const { getDb, closeDb } = await import("@/lib/db/client");
-  const { seedTestCompanies } = await import("../helpers/fixtures");
+  const { loadOrderRecords, scenarioRecords, seedTestCompanies, toCsv } = await import("../helpers/fixtures");
   seedTestCompanies(getDb());
+
+  const { headers, records } = await loadOrderRecords();
+  const sampleRecords = scenarioRecords(records);
+  const csvOf = (list: Record<string, string>[]) => toCsv(headers, list);
 
   afterAll(() => {
     closeDb();
@@ -57,35 +64,35 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
   const stripeMappingId = () => sql<{ ID: number }>(`SELECT ID FROM GatewayCompanyMapping WHERE PaymentGatewayName = '${STRIPE}'`)[0]?.ID;
   const setStripe = (comCode: string) => upsertGatewayMapping({ ID: stripeMappingId(), PaymentGatewayName: STRIPE, ComCode: comCode, IsActive: 1 });
   const STRIPE_ORDERS = `SELECT OrderId FROM RawOrders WHERE PaymentGatewayName = '${STRIPE}'`;
-  const redatedCsv = () => toCsv(sampleRecords.map((r) => (r.PaymentGatewayName === STRIPE ? { ...r, FulfilledAt: "11/22/2025" } : r)));
+  const redatedCsv = () => csvOf(sampleRecords.map((r) => (r.PaymentGatewayName === STRIPE ? { ...r, FulfilledAt: SCENARIO_FREE_DAY } : r)));
   const NOV = { periodFrom: "202511", periodTo: "202511" };
   /** Dữ liệu mẫu, Stripe → ZENIROXPAY, import + build + post */
   const fresh = async () => {
     resetTransactionalData();
     setStripe("ZENIROXPAY");
-    await importOrders(toCsv(sampleRecords), "orders-sample.csv");
+    await importOrders(csvOf(sampleRecords), "orders-sample.csv");
     runBuildOrders();
     runPost("All");
-    expect(glTotal()).toBe(6339.7);
+    expect(glTotal()).toBe(GL_TOTAL);
   };
 
   describe("1. đơn trả qua 2 cổng, chỉ 1 cổng đổi công ty", () => {
     const main = sampleRecords.find((r) => r.OrderId === MAIN_ORDER)!;
-    const splitCsv = toCsv([...sampleRecords, { ...main, ItemCode: `${main.ItemCode}-B`, PaymentGatewayName: STRIPE }]);
+    const splitCsv = csvOf([...sampleRecords, { ...main, ItemCode: `${main.ItemCode}-B`, PaymentGatewayName: STRIPE }]);
 
     it("post khi cả 2 cổng cùng ZENIROXPAY", async () => {
-      expect(await importOrders(splitCsv, "split.csv")).toMatchObject({ InsertedRows: 65, ErrorRows: 0 });
+      expect(await importOrders(splitCsv, "split.csv")).toMatchObject({ InsertedRows: 432, ErrorRows: 0 });
       runBuildOrders();
-      expect(runPost("All")[1]).toMatchObject({ Status: "SUCCESS", PostedEvents: 174 });
-      expect(gl()).toEqual({ ZENIROXPAY: 6402 });
+      expect(runPost("All")[1]).toMatchObject({ Status: "SUCCESS", PostedEvents: EVENTS });
+      expect(gl()).toEqual({ ZENIROXPAY: GL_TOTAL_SPLIT });
     });
 
     it("đổi cổng Stripe → ONTARIO: item chuyển đi bị chặn, Post không ghi thêm (full build và build theo ONTARIO)", () => {
       setStripe("ONTARIO");
       for (const scope of [{}, { comCode: "ONTARIO" }]) {
-        expect(runBuildOrders(scope)).toMatchObject({ Status: "SUCCESS", EventsBlocked: 15 });
+        expect(runBuildOrders(scope)).toMatchObject({ Status: "SUCCESS", EventsBlocked: STRIPE_EVENTS + 3 });
         expect(runPost("All")[1].Status).toBe("NOTHING_TO_POST");
-        expect(gl()).toEqual({ ZENIROXPAY: 6402 });
+        expect(gl()).toEqual({ ZENIROXPAY: GL_TOTAL_SPLIT });
       }
       expect(sql(`SELECT ComCode, PostStatus, count(*) n FROM AccountingEvent WHERE OrderID = '${MAIN_ORDER}' GROUP BY 1, 2 ORDER BY 1`)).toEqual([
         { ComCode: "ONTARIO", PostStatus: "ERROR", n: 3 },
@@ -97,8 +104,8 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
       unpost({ scope: { comCode: "ZENIROXPAY" } });
       expect(runBuildOrders()).toMatchObject({ EventsBlocked: 0 });
       runPost("All");
-      expect(gl()).toEqual({ ONTARIO: 563.7, ZENIROXPAY: 5838.3 });
-      expect(glTotal()).toBe(6402);
+      expect(gl()).toEqual({ ONTARIO: 4038.98, ZENIROXPAY: 39250.9 });
+      expect(glTotal()).toBe(GL_TOTAL_SPLIT);
     });
   });
 
@@ -106,30 +113,30 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
     it("chuẩn bị: dữ liệu mẫu, Stripe → ZENIROXPAY, post", async () => {
       resetTransactionalData();
       setStripe("ZENIROXPAY");
-      await importOrders(toCsv(sampleRecords), "orders-sample.csv");
+      await importOrders(csvOf(sampleRecords), "orders-sample.csv");
       runBuildOrders();
       runPost("All");
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
     });
 
     it("gỡ mapping Stripe → Build: dòng Stripe thành ERROR nhưng import lại dòng đổi ngày giao vẫn bị từ chối", async () => {
       deleteGatewayMapping(stripeMappingId());
       runBuildOrders();
       expect(sql("SELECT BuildStatus, count(*) n FROM RawOrders WHERE PaymentGatewayName = 'ZeniroxPay - Stripe' GROUP BY 1")).toEqual([
-        { BuildStatus: "ERROR", n: 4 },
+        { BuildStatus: "ERROR", n: 41 },
       ]);
 
-      const redated = sampleRecords.map((r) => (r.PaymentGatewayName === STRIPE ? { ...r, FulfilledAt: "11/22/2025" } : r));
-      const result = await importOrders(toCsv(redated), "redated.csv");
-      expect(result).toMatchObject({ ReplacedRows: 0, ErrorRows: 4 });
+      const redated = sampleRecords.map((r) => (r.PaymentGatewayName === STRIPE ? { ...r, FulfilledAt: SCENARIO_FREE_DAY } : r));
+      const result = await importOrders(csvOf(redated), "redated.csv");
+      expect(result).toMatchObject({ ReplacedRows: 0, ErrorRows: 41 });
       expect(result.errors.every((e) => e.message.includes("đã ghi sổ"))).toBe(true);
     });
 
     it("gắn lại mapping → Build + Post: không ghi sổ trùng", () => {
       upsertGatewayMapping({ PaymentGatewayName: STRIPE, ComCode: "ZENIROXPAY", IsActive: 1 });
-      expect(runBuildOrders()).toMatchObject({ EventsCreated: 0, EventsBlocked: 0, EventsUnchangedPosted: 174 });
+      expect(runBuildOrders()).toMatchObject({ EventsCreated: 0, EventsBlocked: 0, EventsUnchangedPosted: EVENTS });
       expect(runPost("All")[1].Status).toBe("NOTHING_TO_POST");
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
     });
   });
 
@@ -141,19 +148,19 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
       unpost({ scope: { comCode: "ZENIROXPAY" } });
 
       const result = await importOrders(redatedCsv(), "redated.csv");
-      expect(result).toMatchObject({ ReplacedRows: 0, ErrorRows: 4 });
+      expect(result).toMatchObject({ ReplacedRows: 0, ErrorRows: 41 });
       expect(result.errors.every((e) => e.message.includes("chưa post") && e.message.includes("Unbuild ComCode ZENIROXPAY kỳ 202511"))).toBe(true);
     });
 
     it("Unbuild theo gợi ý → import được → gắn lại mapping, Build + Post: không ghi sổ trùng", async () => {
-      expect(unbuild({ scope: { comCode: "ZENIROXPAY", ...NOV } })).toMatchObject({ deletedEvents: 174, rawRowsReset: 60 }) // 4 dòng UNFULFILLED không có ngày giao nằm ngoài phạm vi kỳ;
-      expect(await importOrders(redatedCsv(), "redated.csv")).toMatchObject({ ReplacedRows: 4, ErrorRows: 0 });
+      expect(unbuild({ scope: { comCode: "ZENIROXPAY", ...NOV } })).toMatchObject({ deletedEvents: EVENTS, rawRowsReset: 403 }) // 4 dòng UNFULFILLED không có ngày giao nằm ngoài phạm vi kỳ;
+      expect(await importOrders(redatedCsv(), "redated.csv")).toMatchObject({ ReplacedRows: 41, ErrorRows: 0 });
       setStripe("ZENIROXPAY");
-      expect(runBuildOrders()).toMatchObject({ EventsCreated: 174, EventsBlocked: 0 });
+      expect(runBuildOrders()).toMatchObject({ EventsCreated: EVENTS, EventsBlocked: 0 });
       runPost("All");
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
       expect(duplicateItems()).toBe(0);
-      expect(count(`SELECT 1 FROM AccountingEvent WHERE OrderID IN (${STRIPE_ORDERS}) AND TransactionID NOT LIKE '%-20251122'`)).toBe(0);
+      expect(count(`SELECT 1 FROM AccountingEvent WHERE OrderID IN (${STRIPE_ORDERS}) AND TransactionID NOT LIKE '%-${SCENARIO_FREE_DAY.replaceAll('-', '')}'`)).toBe(0);
     });
   });
 
@@ -164,12 +171,12 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
       oldTxns = sql<{ t: string }>(`SELECT DISTINCT TransactionID t FROM AccountingEvent WHERE OrderID IN (${STRIPE_ORDERS})`)
         .map((r) => `'${r.t}'`)
         .join(",");
-      exec(`UPDATE RawOrders SET FulfilledAt = '2025-11-22' || substr(FulfilledAt, 11) WHERE PaymentGatewayName = '${STRIPE}'`);
+      exec(`UPDATE RawOrders SET FulfilledAt = '${SCENARIO_FREE_DAY}' WHERE PaymentGatewayName = '${STRIPE}'`);
 
-      expect(runBuildOrders()).toMatchObject({ EventsCreated: 12, EventsBlocked: 12, EventsRemoved: 0, EventsUnchangedPosted: 162 });
+      expect(runBuildOrders()).toMatchObject({ EventsCreated: STRIPE_EVENTS, EventsBlocked: STRIPE_EVENTS, EventsRemoved: 0, EventsUnchangedPosted: EVENTS - STRIPE_EVENTS });
       expect(posted(runPost("All")).PostedEvents).toBe(0);
-      expect(glTotal()).toBe(6339.7);
-      expect(exceptions("POSTED_KEY_CHANGED")).toBe(12);
+      expect(glTotal()).toBe(GL_TOTAL);
+      expect(exceptions("POSTED_KEY_CHANGED")).toBe(STRIPE_EVENTS);
       expect(exceptions("POSTED_SOURCE_CHANGED")).toBe(0);
     });
 
@@ -178,13 +185,13 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
       expect(blocked.ErrorMessage).toContain("Unpost ComCode ZENIROXPAY kỳ 202511 rồi Build + Post lại");
 
       unpost({ scope: { comCode: "ZENIROXPAY", ...NOV } });
-      expect(runBuildOrders({ comCode: "ZENIROXPAY", ...NOV })).toMatchObject({ EventsRemoved: 12, EventsBlocked: 0 });
+      expect(runBuildOrders({ comCode: "ZENIROXPAY", ...NOV })).toMatchObject({ EventsRemoved: STRIPE_EVENTS, EventsBlocked: 0 });
       runPost("All");
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
       expect(duplicateItems()).toBe(0);
       expect(count(`SELECT 1 FROM AccountingEvent WHERE TransactionID IN (${oldTxns})`)).toBe(0);
       expect(count("SELECT 1 FROM ExceptionLog WHERE ExceptionType LIKE 'POSTED_%'")).toBe(0);
-      expect(runBuildOrders()).toMatchObject({ EventsCreated: 0, EventsRemoved: 0, EventsBlocked: 0, EventsUnchangedPosted: 174 });
+      expect(runBuildOrders()).toMatchObject({ EventsCreated: 0, EventsRemoved: 0, EventsBlocked: 0, EventsUnchangedPosted: EVENTS });
     });
   });
 
@@ -192,18 +199,18 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
     it("đổi cổng → Build (chặn) → Unpost ComCode cũ → Unbuild ComCode mới: dòng vẫn BUILT, import đổi ngày giao bị từ chối", async () => {
       await fresh();
       setStripe("ONTARIO");
-      expect(runBuildOrders().EventsBlocked).toBe(12);
+      expect(runBuildOrders().EventsBlocked).toBe(STRIPE_EVENTS);
       unpost({ scope: { comCode: "ZENIROXPAY", ...NOV } });
 
-      expect(unbuild({ scope: { comCode: "ONTARIO" } })).toMatchObject({ deletedEvents: 12, rawRowsReset: 0 });
-      expect(sql(`SELECT BuildStatus, count(*) n FROM RawOrders WHERE PaymentGatewayName = '${STRIPE}' GROUP BY 1`)).toEqual([{ BuildStatus: "BUILT", n: 4 }]);
-      expect(await importOrders(redatedCsv(), "redated.csv")).toMatchObject({ ReplacedRows: 0, ErrorRows: 4 });
+      expect(unbuild({ scope: { comCode: "ONTARIO" } })).toMatchObject({ deletedEvents: STRIPE_EVENTS, rawRowsReset: 0 });
+      expect(sql(`SELECT BuildStatus, count(*) n FROM RawOrders WHERE PaymentGatewayName = '${STRIPE}' GROUP BY 1`)).toEqual([{ BuildStatus: "BUILT", n: 41 }]);
+      expect(await importOrders(redatedCsv(), "redated.csv")).toMatchObject({ ReplacedRows: 0, ErrorRows: 41 });
     });
 
     it("Build + Post: đơn chia đúng 2 công ty, tổng sổ không đổi", () => {
       runBuildOrders();
       runPost("All");
-      expect(gl()).toEqual({ ONTARIO: 501.4, ZENIROXPAY: 5838.3 });
+      expect(gl()).toEqual({ ONTARIO: 3976.68, ZENIROXPAY: 39250.9 });
       expect(duplicateItems()).toBe(0);
     });
   });
@@ -212,17 +219,17 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
     it("event chưa có ItemCodes (tạo trước khi có cột) → Post giữ lại; Build lại rồi Post bình thường", async () => {
       resetTransactionalData();
       setStripe("ZENIROXPAY");
-      await importOrders(toCsv(sampleRecords), "orders-sample.csv");
+      await importOrders(csvOf(sampleRecords), "orders-sample.csv");
       runBuildOrders();
       exec("UPDATE AccountingEvent SET ItemCodes = NULL");
 
-      expect(posted(runPost("All"))).toEqual({ PostedEvents: 0, ErrorEvents: 174 });
+      expect(posted(runPost("All"))).toEqual({ PostedEvents: 0, ErrorEvents: EVENTS });
       expect(glTotal()).toBe(0);
-      expect(exceptions("DUPLICATE_ITEM")).toBe(174);
+      expect(exceptions("DUPLICATE_ITEM")).toBe(EVENTS);
 
-      expect(runBuildOrders()).toMatchObject({ EventsReplaced: 174, EventsBlocked: 0 });
-      expect(posted(runPost("All"))).toEqual({ PostedEvents: 174, ErrorEvents: 0 });
-      expect(glTotal()).toBe(6339.7);
+      expect(runBuildOrders()).toMatchObject({ EventsReplaced: EVENTS, EventsBlocked: 0 });
+      expect(posted(runPost("All"))).toEqual({ PostedEvents: EVENTS, ErrorEvents: 0 });
+      expect(glTotal()).toBe(GL_TOTAL);
       expect(exceptions("DUPLICATE_ITEM")).toBe(0);
     });
 
@@ -238,19 +245,19 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
          SELECT ${cols.map((c) => override[c] ?? `"${c}"`).join(", ")} FROM AccountingEvent WHERE OrderID IN (${STRIPE_ORDERS})`,
       );
 
-      expect(posted(runPost("All"))).toEqual({ PostedEvents: 0, ErrorEvents: 12 });
-      expect(gl()).toEqual({ ZENIROXPAY: 6339.7 });
-      expect(exceptions("DUPLICATE_ITEM")).toBe(12);
+      expect(posted(runPost("All"))).toEqual({ PostedEvents: 0, ErrorEvents: STRIPE_EVENTS });
+      expect(gl()).toEqual({ ZENIROXPAY: GL_TOTAL });
+      expect(exceptions("DUPLICATE_ITEM")).toBe(STRIPE_EVENTS);
 
-      expect(runBuildOrders()).toMatchObject({ EventsReplaced: 12, EventsBlocked: 12 });
+      expect(runBuildOrders()).toMatchObject({ EventsReplaced: STRIPE_EVENTS, EventsBlocked: STRIPE_EVENTS });
       expect(posted(runPost("All")).PostedEvents).toBe(0);
-      expect(gl()).toEqual({ ZENIROXPAY: 6339.7 });
+      expect(gl()).toEqual({ ZENIROXPAY: GL_TOTAL });
     });
   });
 
   describe("7. event POSTED tạo trước khi có cột ItemCodes", () => {
     const main = sampleRecords.find((r) => r.OrderId === MAIN_ORDER)!;
-    const withItemB = (gateway: string) => toCsv([...sampleRecords, { ...main, ItemCode: `${main.ItemCode}-B`, PaymentGatewayName: gateway }]);
+    const withItemB = (gateway: string) => csvOf([...sampleRecords, { ...main, ItemCode: `${main.ItemCode}-B`, PaymentGatewayName: gateway }]);
 
     it("sửa dòng lỗi (chưa từng post) cùng đơn: import báo cần Build lại; Build bổ sung ItemCodes rồi import được, không ghi trùng", async () => {
       resetTransactionalData();
@@ -258,21 +265,21 @@ describe("chặn ghi sổ trùng qua các đường khác", async () => {
       await importOrders(withItemB("Zeniroxpay Typo"), "typo.csv");
       runBuildOrders();
       runPost("All");
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
       exec("UPDATE AccountingEvent SET ItemCodes = NULL");
 
       const refused = await importOrders(withItemB("ZeniroxPay Inc."), "fixed.csv");
       expect(refused).toMatchObject({ ReplacedRows: 0, ErrorRows: 1 });
       expect(refused.errors[0].message).toContain("tạo trước khi có cột ItemCodes");
 
-      expect(runBuildOrders()).toMatchObject({ EventsBlocked: 0, EventsUnchangedPosted: 174 });
+      expect(runBuildOrders()).toMatchObject({ EventsBlocked: 0, EventsUnchangedPosted: EVENTS });
       expect(count("SELECT 1 FROM AccountingEvent WHERE ItemCodes IS NULL")).toBe(0);
       expect(await importOrders(withItemB("ZeniroxPay Inc."), "fixed.csv")).toMatchObject({ ReplacedRows: 1, ErrorRows: 0 });
 
       expect(runBuildOrders()).toMatchObject({ EventsBlocked: 0, EventsCreated: 0 });
       expect(exceptions("POSTED_SOURCE_CHANGED")).toBe(3);
       expect(posted(runPost("All")).PostedEvents).toBe(0);
-      expect(glTotal()).toBe(6339.7);
+      expect(glTotal()).toBe(GL_TOTAL);
       expect(duplicateItems()).toBe(0);
     });
   });

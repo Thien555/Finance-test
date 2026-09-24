@@ -32,7 +32,7 @@ const norm = (s: string | null | undefined) => (s ?? "").trim().toUpperCase();
 
 /**
  * Chuẩn hóa số tài khoản ngân hàng để tra MappingBankAccount.
- * Sheet Bank_Royal ghi "076621019512" còn master ghi "76621019512" → bỏ số 0 đứng đầu.
+ * Export nguồn hay đệm số 0 ở đầu ("076621019512") trong khi master ghi "76621019512" → bỏ số 0 đứng đầu.
  * Cũng bỏ khoảng trắng và dấu gạch hay gặp trong export ngân hàng.
  */
 export const normBankAccount = (s: string | null | undefined) =>

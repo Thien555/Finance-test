@@ -1,5 +1,5 @@
 /**
- * Chạy cả luồng của 4 nguồn ngoài Orders trên 1 file SQLite tạm:
+ * Chạy cả luồng của 3 nguồn ngoài Orders trên 1 file SQLite tạm (file dữ liệu thật, không cắt lát):
  * Import → Build → Post → Unpost → Unbuild → Build + Post lại.
  */
 import { readFileSync, rmSync } from "node:fs";
@@ -27,62 +27,50 @@ describe("luồng nguồn ngoài Orders → GLTrans trên DB", async () => {
     for (const suffix of ["", "-wal", "-shm"]) rmSync(dbFile + suffix, { force: true });
   });
 
-  const glOf = (dataSource: string) => listGl({ dataSource, pageSize: 5000 });
+  /** Chỉ dùng `.total`/`.totals` (tính trên toàn bộ tập lọc) nên không cần kéo hàng nghìn dòng */
+  const glOf = (dataSource: string) => listGl({ dataSource, pageSize: 1 });
 
-  it("import 5 sheet vào 4 bảng raw", async () => {
-    expect(await importSourceFile("paypal", sample("paypal-sample.csv"), "paypal-sample.csv")).toMatchObject({
+  it("import 3 file vào 3 bảng raw", async () => {
+    expect(await importSourceFile("paypal", sample("Bank_Paypal.csv"), "Bank_Paypal.csv")).toMatchObject({
       Status: "SUCCESS",
       DataSource: "PAYPAL",
-      TotalRows: 81,
-      InsertedRows: 81,
+      TotalRows: 142_659,
+      InsertedRows: 142_659,
       ErrorRows: 0,
     });
-    expect(await importSourceFile("stripe", sample("stripe-sample.csv"), "stripe-sample.csv")).toMatchObject({
+    expect(await importSourceFile("stripe", sample("Bank_Stripe.csv"), "Bank_Stripe.csv")).toMatchObject({
       Status: "SUCCESS",
-      TotalRows: 48,
-      InsertedRows: 48,
+      TotalRows: 1_413,
+      InsertedRows: 1_413,
     });
-    expect(await importSourceFile("pipo", sample("pipo-sample.csv"), "pipo-sample.csv")).toMatchObject({
+    expect(await importSourceFile("pipo", sample("Bank_Pipo.csv"), "Bank_Pipo.csv")).toMatchObject({
       Status: "SUCCESS",
-      TotalRows: 36,
-      InsertedRows: 36,
+      TotalRows: 952,
+      InsertedRows: 952,
     });
-    expect(
-      await importSourceFile("accounting-source", sample("master-card-sample.csv"), "master-card-sample.csv", "Master Card"),
-    ).toMatchObject({ Status: "SUCCESS", TotalRows: 39, InsertedRows: 39 });
-    expect(
-      await importSourceFile("accounting-source", sample("bank-royal-sample.csv"), "bank-royal-sample.csv", "Bank_Royal"),
-    ).toMatchObject({ Status: "SUCCESS", TotalRows: 31, InsertedRows: 31 });
   });
 
   it("import lại file y hệt thì bỏ qua hết", async () => {
-    const again = await importSourceFile("paypal", sample("paypal-sample.csv"), "paypal-sample.csv");
-    expect(again).toMatchObject({ InsertedRows: 0, ReplacedRows: 0, SkippedRows: 81, ErrorRows: 0 });
-  });
-
-  it("2 sheet của AccountingSource nằm chung 1 bảng, khóa không đụng nhau", () => {
-    const s = runBuildSource("accounting-source");
-    expect(s).toMatchObject({ Status: "SUCCESS", SourceRows: 70, ErrorRows: 0, EventsError: 0 });
-    expect(s.EventsCreated).toBe(39 + 55);
+    const again = await importSourceFile("paypal", sample("Bank_Paypal.csv"), "Bank_Paypal.csv");
+    expect(again).toMatchObject({ InsertedRows: 0, ReplacedRows: 0, SkippedRows: 142_659, ErrorRows: 0 });
   });
 
   it("build PayPal / Stripe / PIPO", () => {
-    expect(runBuildSource("paypal")).toMatchObject({ Status: "SUCCESS", SourceRows: 81, ErrorRows: 1, EventsCreated: 113 });
-    expect(runBuildSource("stripe")).toMatchObject({ Status: "SUCCESS", SourceRows: 48, ErrorRows: 0, EventsCreated: 71 });
-    expect(runBuildSource("pipo")).toMatchObject({ Status: "SUCCESS", SourceRows: 36, SkippedRows: 2, EventsCreated: 48 });
+    expect(runBuildSource("paypal")).toMatchObject({ Status: "SUCCESS", SourceRows: 142_659, ErrorRows: 1, EventsCreated: 198_243 });
+    expect(runBuildSource("stripe")).toMatchObject({ Status: "SUCCESS", SourceRows: 1_413, ErrorRows: 0, EventsCreated: 2_712 });
+    expect(runBuildSource("pipo")).toMatchObject({ Status: "SUCCESS", SourceRows: 952, SkippedRows: 3, EventsCreated: 968 });
   });
 
   it("build lại khi chưa post → thay thế, không nhân đôi", () => {
-    expect(runBuildSource("paypal")).toMatchObject({ EventsCreated: 0, EventsReplaced: 113 });
-    expect(listEvents({ dataSource: "PAYPAL" }).total).toBe(113);
+    expect(runBuildSource("paypal")).toMatchObject({ EventsCreated: 0, EventsReplaced: 198_243 });
+    expect(listEvents({ dataSource: "PAYPAL" }).total).toBe(198_243);
   });
 
   it("post từng nguồn → mọi chứng từ cân Nợ/Có", () => {
     for (const [dataSource, events] of [
-      ["PAYPAL", 113],
-      ["STRIPE", 71],
-      ["PIPO", 48],
-      ["ACCOUNTINGSOURCE", 94],
+      ["PAYPAL", 198_243],
+      ["STRIPE", 2_712],
+      ["PIPO", 968],
     ] as const) {
       const results = runPost("All", { dataSource });
       const posted = results.reduce((s, r) => s + r.PostedEvents, 0);
@@ -96,62 +84,52 @@ describe("luồng nguồn ngoài Orders → GLTrans trên DB", async () => {
     expect(listEvents({ postStatus: "NEW" }).total).toBe(0);
   });
 
-  it("Master Card ra đúng Nợ 11202091 / Có 11202061, tổng 1.076,87 USD", () => {
-    const gl = glOf("ACCOUNTINGSOURCE");
-    const card = gl.rows.filter((l) => l.AccountCode === "11202091");
-    expect(card.length).toBe(39);
-    expect(card.every((l) => (l.AccountedDr ?? 0) > 0)).toBe(true);
-    expect(card.reduce((s, l) => s + (l.AccountedDr ?? 0), 0)).toBeCloseTo(1076.87, 2);
-    // Bank_Royal cũng có dòng Có 11202061 nên phải ghép theo chứng từ của Master Card
-    const cardDocs = new Set(card.map((l) => l.DocNum));
-    const contra = gl.rows.filter((l) => cardDocs.has(l.DocNum) && l.AccountCode === "11202061");
-    expect(contra.length).toBe(39);
-    expect(contra.every((l) => (l.AccountedCr ?? 0) > 0)).toBe(true);
-  });
-
-  it("Bank_Royal ghi CAD và quy đổi sang USD", () => {
-    const cad = glOf("ACCOUNTINGSOURCE").rows.filter((l) => l.InputCurr === "CAD");
-    expect(cad.length).toBeGreaterThan(0);
-    expect(cad.every((l) => l.FncCurr === "USD" && l.RateType === "DIV" && l.XRate > 1)).toBe(true);
-  });
-
   it("sửa tay cột JournalType rồi import lại dòng đã build → bị chặn", async () => {
-    const changed = Buffer.from(
-      sample("paypal-sample.csv").toString("utf8").replace("PP_RESERVE_HOLD", "PP_GENERAL_HOLD"),
-    );
-    const r = await importSourceFile("paypal", changed, "paypal-sample.csv");
-    expect(r.ErrorRows).toBeGreaterThan(0);
+    // Chỉ gửi lại header + 1 dòng đã sửa: đủ để kiểm chốt chặn mà không phải import lại 142k dòng
+    const EOL = String.fromCharCode(13, 10);
+    const [header, ...lines] = sample("Bank_Paypal.csv").toString("utf8").split(EOL);
+    const target = lines.find((l) => l.includes("PP_RESERVE_HOLD"))!;
+    const changed = Buffer.from([header, target.replace("PP_RESERVE_HOLD", "PP_GENERAL_HOLD")].join(EOL) + EOL, "utf8");
+
+    const r = await importSourceFile("paypal", changed, "Bank_Paypal.csv");
+    expect(r.TotalRows).toBe(1);
+    expect(r.ErrorRows).toBe(1);
     expect(r.errors[0].message).toContain("Unbuild");
   });
 
   it("exception của nguồn được gom nhóm, không ghi từng dòng", () => {
     const ex = listExceptions({ pageSize: 500 });
     const paypal = ex.rows.filter((e) => e.DataSource === "PAYPAL");
-    expect(paypal.length).toBeLessThan(60); // 113 event / 81 dòng nhưng chỉ vài chục dòng exception gom nhóm
+    // 198.243 event / 142.659 dòng nhưng exception gom nhóm nên chỉ vài chục dòng
+    expect(paypal.length).toBeLessThan(60);
+    expect(paypal).toHaveLength(37);
     expect(paypal.some((e) => e.ExceptionType === "MISSING_JOURNAL_TYPE" && e.Severity === "ERROR")).toBe(true);
     expect(paypal.some((e) => e.Message?.includes("dòng"))).toBe(true);
   });
 
+  // Chu kỳ Unpost → Unbuild → Build + Post lại chạy trên Stripe (1.413 dòng): logic dùng chung cho mọi
+  // nguồn, làm trên PayPal 142k dòng chỉ tốn thêm vài phút mà không kiểm thêm được gì.
   it("unpost + unbuild theo nguồn chỉ động vào nguồn đó", () => {
-    const otherBefore = listEvents({ dataSource: "STRIPE" }).total;
+    const otherBefore = listEvents({ dataSource: "PAYPAL" }).total;
 
-    unpost({ scope: { dataSource: "PAYPAL" } });
-    expect(glOf("PAYPAL").total).toBe(0);
-    expect(listEvents({ dataSource: "PAYPAL", postStatus: "NEW" }).total).toBe(113);
+    unpost({ scope: { dataSource: "STRIPE" } });
+    expect(glOf("STRIPE").total).toBe(0);
+    expect(listEvents({ dataSource: "STRIPE", postStatus: "NEW" }).total).toBe(2_712);
 
-    const r = unbuild({ scope: { dataSource: "PAYPAL" } });
-    expect(r).toMatchObject({ deletedEvents: 113, rawRowsReset: 81 });
-    expect(listEvents({ dataSource: "PAYPAL" }).total).toBe(0);
+    const r = unbuild({ scope: { dataSource: "STRIPE" } });
+    expect(r).toMatchObject({ deletedEvents: 2_712, rawRowsReset: 1_413 });
+    expect(listEvents({ dataSource: "STRIPE" }).total).toBe(0);
 
-    expect(listEvents({ dataSource: "STRIPE" }).total).toBe(otherBefore);
-    expect(glOf("STRIPE").total).toBeGreaterThan(0);
+    expect(listEvents({ dataSource: "PAYPAL" }).total).toBe(otherBefore);
+    expect(glOf("PAYPAL").total).toBeGreaterThan(0);
   });
 
-  it("build + post lại PayPal ra kết quả giống hệt lần đầu", () => {
-    expect(runBuildSource("paypal").EventsCreated).toBe(113);
-    const posted = runPost("All", { dataSource: "PAYPAL" }).reduce((s, r) => s + r.PostedEvents, 0);
-    expect(posted).toBe(113);
-    const gl = glOf("PAYPAL");
+  it("build + post lại Stripe ra kết quả giống hệt lần đầu", () => {
+    expect(runBuildSource("stripe").EventsCreated).toBe(2_712);
+    const posted = runPost("All", { dataSource: "STRIPE" }).reduce((s, r) => s + r.PostedEvents, 0);
+    expect(posted).toBe(2_712);
+    const gl = glOf("STRIPE");
     expect(gl.totals.AccountedDr).toBe(gl.totals.AccountedCr);
+    expect(gl.totals.AccountedDr).toBe(123_799.26);
   });
 });

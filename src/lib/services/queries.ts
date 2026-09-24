@@ -16,7 +16,6 @@ import {
   mappingBankAccount,
   partners,
   postingBatch,
-  rawAccountingSource,
   rawOrders,
   rawPaypal,
   rawPipo,
@@ -252,11 +251,6 @@ const RAW_SOURCE_TABLES = {
   paypal: { table: rawPaypal, id: rawPaypal.RawPaypalID, search: [rawPaypal.SourceKey, rawPaypal.TransactionID, rawPaypal.InvoiceID, rawPaypal.PartnerCode, rawPaypal.StoreName] },
   stripe: { table: rawStripe, id: rawStripe.RawStripeID, search: [rawStripe.SourceKey, rawStripe.Id, rawStripe.MetaInvoiceId, rawStripe.PartnerCode, rawStripe.StoreName] },
   pipo: { table: rawPipo, id: rawPipo.RawPipoID, search: [rawPipo.SourceKey, rawPipo.TransactionId, rawPipo.PartnerCode, rawPipo.StoreName, rawPipo.FromTo] },
-  "accounting-source": {
-    table: rawAccountingSource,
-    id: rawAccountingSource.RawAccountingSourceID,
-    search: [rawAccountingSource.SourceKey, rawAccountingSource.IDTransaction, rawAccountingSource.PartnerCode, rawAccountingSource.Description, rawAccountingSource.SheetName],
-  },
 } as const;
 
 export interface RawSourceFilter extends Paging {

@@ -5,17 +5,37 @@ import { orderSourceId } from "@/lib/engine/keys";
 import type { MasterIndex } from "@/lib/engine/masters";
 import { reconcileEvents } from "@/lib/engine/reconcile-events";
 import type { EventDraft } from "@/lib/engine/types";
-import { loadIndex, loadMasters, loadSampleOrders, TEST_COMPANIES, TEST_GATEWAY_MAPPINGS, toEventRows } from "../helpers/fixtures";
+import {
+  loadIndex,
+  loadMasters,
+  loadSampleOrders,
+  SCENARIO_FREE_DAY,
+  scenarioRows,
+  TEST_COMPANIES,
+  TEST_GATEWAY_MAPPINGS,
+  toEventRows,
+} from "../helpers/fixtures";
 
 const STRIPE = "ZeniroxPay - Stripe";
 const MAIN_ORDER = "QVAJV-191125-Q1Z3V";
 const MAIN_TXN = "ORD-QVAJV-191125-Q1Z3V-20251121";
 
-const rows = await loadSampleOrders();
+// File này gọi plan() ~25 lần; chạy trên tập con kịch bản (431 dòng, thuần kỳ 202511)
+// thay vì 55k dòng — cùng ý nghĩa, mỗi lần ~40ms thay vì hàng chục giây.
+const rows = scenarioRows(await loadSampleOrders());
 const baseIndex = loadIndex();
 const baseDrafts = buildOrderEvents(rows, baseIndex).events;
 const main = rows.find((r) => r.OrderId === MAIN_ORDER)!;
 const stripeOrderIds = new Set(rows.filter((r) => r.PaymentGatewayName === STRIPE).map((r) => r.OrderId));
+
+/** Mọi kỳ vọng số lượng suy từ chính dữ liệu, không ghi cứng theo kích thước file */
+const TOTAL = baseDrafts.length;
+const jtcCount = (code: string) => baseDrafts.filter((e) => e.JournalTypeCode === code).length;
+const STRIPE_EVENTS = baseDrafts.filter((e) => stripeOrderIds.has(e.OrderID ?? "")).length;
+const PRODUCT_EVENTS = jtcCount("ORD_REV_PRODUCT_FULFILLED");
+const PROFIT_EVENTS = jtcCount("ORD_SELLER_PROFIT_FULFILLED");
+/** Đơn mốc luôn sinh đúng 3 event (PRODUCT + SHIPADD + SELLER_PROFIT) */
+const MAIN_EVENTS = 3;
 
 type Mapping = { PaymentGatewayName: string; ComCode: string; IsActive: number };
 
@@ -70,7 +90,7 @@ function splitOrder(mainGateway: string, secondGateway: string): RawOrderRow[] {
 describe("reconcileEvents — build lại bình thường", () => {
   it("không đổi gì sau khi post → giữ nguyên, không chặn, không cảnh báo", () => {
     expect(plan(baseIndex, rows, postedBase())).toMatchObject({
-      unchangedPosted: 174,
+      unchangedPosted: TOTAL,
       blocked: 0,
       insert: [],
       replace: [],
@@ -82,7 +102,7 @@ describe("reconcileEvents — build lại bình thường", () => {
   it("chưa post → thay thế toàn bộ, không xóa", () => {
     const p = plan(baseIndex, rows, toEventRows(baseDrafts));
     expect(p).toMatchObject({ unchangedPosted: 0, blocked: 0, insert: [], remove: [], exceptions: [] });
-    expect(p.replace).toHaveLength(174);
+    expect(p.replace).toHaveLength(TOTAL);
   });
 
   it("event lưu ItemCodes của các dòng nguồn", () => {
@@ -95,8 +115,8 @@ describe("reconcileEvents — build lại bình thường", () => {
     const index = loadIndex({ lineRules: [...masters.lineRules, { ...product, JournalLineRuleID: 9999, RuleSeq: 30 }] });
     const p = plan(index, rows, postedBase());
 
-    expect(p).toMatchObject({ blocked: 0, unchangedPosted: 174, exceptions: [] });
-    expect(p.insert).toHaveLength(60);
+    expect(p).toMatchObject({ blocked: 0, unchangedPosted: TOTAL, exceptions: [] });
+    expect(p.insert).toHaveLength(PRODUCT_EVENTS);
     expect(p.insert.every((e) => e.EventSeq === 30 && e.PostStatus === "NEW")).toBe(true);
   });
 });
@@ -105,9 +125,9 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
   it("đổi GatewayCompanyMapping → draft ComCode mới bị giữ ERROR, không có event NEW nào", () => {
     const p = plan(stripeToOntario(), rows, postedBase());
 
-    expect(stripeOrderIds.size).toBe(4);
-    expect(p).toMatchObject({ blocked: 12, unchangedPosted: 162, replace: [], remove: [] });
-    expect(p.insert).toHaveLength(12);
+    expect(stripeOrderIds.size).toBe(41);
+    expect(p).toMatchObject({ blocked: STRIPE_EVENTS, unchangedPosted: TOTAL - STRIPE_EVENTS, replace: [], remove: [] });
+    expect(p.insert).toHaveLength(STRIPE_EVENTS);
     for (const e of p.insert) {
       expect(e).toMatchObject({ ComCode: "ONTARIO", PostStatus: "ERROR", ErrorStage: "BUILD" });
       expect(stripeOrderIds.has(e.OrderID!)).toBe(true);
@@ -115,15 +135,15 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
       expect(e.ErrorMessage).toMatch(/Unpost ComCode ZENIROXPAY kỳ 202511 rồi Build \+ Post lại \(Post cả ComCode ONTARIO\)/);
     }
     const keyChanged = ofType(p, "POSTED_KEY_CHANGED");
-    expect(keyChanged).toHaveLength(12);
+    expect(keyChanged).toHaveLength(STRIPE_EVENTS);
     expect(keyChanged.every((x) => x.Severity === "ERROR" && x.ComCode === "ONTARIO")).toBe(true);
-    expect(new Set(keyChanged.map((x) => x.SourceKey)).size).toBe(12);
+    expect(new Set(keyChanged.map((x) => x.SourceKey)).size).toBe(STRIPE_EVENTS);
     expect(ofType(p, "POSTED_SOURCE_CHANGED")).toHaveLength(0);
   });
 
   it("Build theo ComCode mới vẫn chặn", () => {
     const p = plan(stripeToOntario(), rows, postedBase(), "ONTARIO");
-    expect(p.blocked).toBe(12);
+    expect(p.blocked).toBe(STRIPE_EVENTS);
     expect(written(p).every((e) => e.PostStatus === "ERROR")).toBe(true);
   });
 
@@ -134,14 +154,14 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
       5000,
     );
     const p = plan(index, rows, [...postedBase(), ...duplicates]);
-    expect(p).toMatchObject({ blocked: 12, insert: [] });
+    expect(p).toMatchObject({ blocked: STRIPE_EVENTS, insert: [] });
     expect(p.replace.every((r) => r.id >= 5000 && r.draft.PostStatus === "ERROR")).toBe(true);
   });
 
   it("event POSTED cũ chưa có ItemCodes (trước khi có cột) → vẫn chặn", () => {
     const legacy = postedBase().map((e) => ({ ...e, ItemCodes: null }));
     const p = plan(stripeToOntario(), rows, legacy);
-    expect(p.blocked).toBe(12);
+    expect(p.blocked).toBe(STRIPE_EVENTS);
     expect(p.insert[0].ErrorMessage).toContain("tạo trước khi có cột ItemCodes");
     expect(plan(baseIndex, rows, legacy)).toMatchObject({ blocked: 0, exceptions: [] });
   });
@@ -154,7 +174,7 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
     const late = [...rows, { ...stripeRow, RawOrderID: 9100, ItemCode: `${stripeRow.ItemCode}-LATE`, PaymentGatewayName: "ZeniroxPay Inc." }];
 
     const p = plan(index, late, db);
-    expect(p.blocked).toBe(12);
+    expect(p.blocked).toBe(STRIPE_EVENTS);
     expect(written(p).filter((e) => e.ComCode === "ONTARIO").every((e) => e.PostStatus === "ERROR")).toBe(true);
   });
 
@@ -165,7 +185,7 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
 
     expect(p).toMatchObject({ blocked: 0, exceptions: [] });
     expect(p.remove.sort()).toEqual(oldStripeIds.sort());
-    expect(p.insert).toHaveLength(12);
+    expect(p.insert).toHaveLength(STRIPE_EVENTS);
     expect(p.insert.every((e) => e.ComCode === "ONTARIO" && e.PostStatus === "NEW")).toBe(true);
   });
 
@@ -176,9 +196,9 @@ describe("chống ghi sổ trùng: cả đơn đổi công ty sau khi post", () 
 
     const p = plan(index, rows, db, "ZENIROXPAY");
     expect(p).toMatchObject({ blocked: 0, exceptions: [] });
-    expect(p.remove).toHaveLength(12);
+    expect(p.remove).toHaveLength(STRIPE_EVENTS);
     const ontario = p.replace.filter((r) => r.draft.ComCode === "ONTARIO");
-    expect(ontario).toHaveLength(12);
+    expect(ontario).toHaveLength(STRIPE_EVENTS);
     expect(ontario.every((r) => r.id >= 5000 && r.draft.PostStatus === "NEW")).toBe(true);
   });
 });
@@ -191,7 +211,7 @@ describe("chống ghi sổ trùng: khóa đổi vì cấu hình / ngày giao", (
     });
     const p = plan(index, rows, postedBase());
 
-    expect(p).toMatchObject({ blocked: 56, unchangedPosted: 118 });
+    expect(p).toMatchObject({ blocked: PROFIT_EVENTS, unchangedPosted: TOTAL - PROFIT_EVENTS });
     expect(p.insert.every((e) => e.EventSeq === 25 && e.PostStatus === "ERROR")).toBe(true);
     expect(p.insert[0].ErrorMessage).toContain("EventSeq 20 → 25");
     expect(ofType(p, "POSTED_SOURCE_CHANGED")).toHaveLength(0);
@@ -205,25 +225,26 @@ describe("chống ghi sổ trùng: khóa đổi vì cấu hình / ngày giao", (
       ),
     });
     const p = plan(index, rows, postedBase());
-    expect(p.blocked).toBe(60);
+    expect(p.blocked).toBe(PRODUCT_EVENTS);
     expect(ofType(p, "POSTED_KEY_CHANGED").every((x) => x.SourceKey!.endsWith("|ORD_REV_PRODUCT_FULFILLED"))).toBe(true);
   });
 
   it("item đã POSTED được build lại ở ngày giao khác (TransactionID khác) → chặn", () => {
-    const redated = rows.map((r) => (r.OrderId === MAIN_ORDER ? { ...r, FulfilledAt: "2025-11-22" } : r));
+    const redated = rows.map((r) => (r.OrderId === MAIN_ORDER ? { ...r, FulfilledAt: SCENARIO_FREE_DAY } : r));
     const p = plan(baseIndex, redated, postedBase());
 
     const mainDrafts = written(p).filter((e) => e.OrderID === MAIN_ORDER);
     expect(mainDrafts).toHaveLength(3);
     expect(mainDrafts.every((e) => e.PostStatus === "ERROR")).toBe(true);
-    expect(mainDrafts[0].ErrorMessage).toContain(`TransactionID ${MAIN_TXN} → ORD-QVAJV-191125-Q1Z3V-20251122`);
+    expect(mainDrafts[0].ErrorMessage).toContain(`TransactionID ${MAIN_TXN} → ORD-QVAJV-191125-Q1Z3V-${SCENARIO_FREE_DAY.replaceAll("-", "")}`);
     expect(p.blocked).toBe(3);
   });
 });
 
 describe("chống ghi sổ trùng: đổi ngày giao", () => {
-  const MAIN_TXN_22 = "ORD-QVAJV-191125-Q1Z3V-20251122";
-  const redate = (list: RawOrderRow[], itemCode: string) => list.map((r) => (r.ItemCode === itemCode ? { ...r, FulfilledAt: "2025-11-22" } : r));
+  // 2025-11-22 đã có dữ liệu thật trong tập con → dời sang ngày trống cùng kỳ 202511
+  const MAIN_TXN_22 = `ORD-QVAJV-191125-Q1Z3V-${SCENARIO_FREE_DAY.replaceAll("-", "")}`;
+  const redate = (list: RawOrderRow[], itemCode: string) => list.map((r) => (r.ItemCode === itemCode ? { ...r, FulfilledAt: SCENARIO_FREE_DAY } : r));
 
   it("1 item của đơn chuyển sang ngày khác, ngày cũ vẫn còn item → cả 2 ngày cùng build vẫn chặn item đã chuyển", () => {
     const twoItems = [...rows, { ...main, RawOrderID: 9001, ItemCode: `${main.ItemCode}-2` }];
@@ -323,7 +344,7 @@ describe("event đã POSTED không còn được sinh ra", () => {
     const changed = rows.map((r) => (r.OrderId === MAIN_ORDER ? { ...r, Profit: 0 } : r));
     const p = plan(baseIndex, changed, postedBase());
 
-    expect(p).toMatchObject({ blocked: 0, insert: [], remove: [], unchangedPosted: 173 });
+    expect(p).toMatchObject({ blocked: 0, insert: [], remove: [], unchangedPosted: TOTAL - 1 });
     expect(p.exceptions).toEqual([
       expect.objectContaining({
         Severity: "WARNING",
@@ -337,7 +358,7 @@ describe("event đã POSTED không còn được sinh ra", () => {
   it("gateway bị gỡ mapping → cảnh báo cho từng event đã post, không chặn", () => {
     const p = plan(indexWith((ms) => ms.filter((m) => m.PaymentGatewayName !== STRIPE)), rows, postedBase());
     expect(p).toMatchObject({ blocked: 0, insert: [] });
-    expect(ofType(p, "POSTED_SOURCE_CHANGED")).toHaveLength(12);
+    expect(ofType(p, "POSTED_SOURCE_CHANGED")).toHaveLength(STRIPE_EVENTS);
   });
 });
 
@@ -353,7 +374,7 @@ describe("đơn đi qua nhiều cổng thanh toán", () => {
       expect(mainOntario).toHaveLength(3);
       expect(mainOntario.every((e) => e.PostStatus === "ERROR" && e.ItemCodes === JSON.stringify([`${main.ItemCode}-B`]))).toBe(true);
       expect(written(p).some((e) => e.PostStatus === "NEW")).toBe(false);
-      expect(p.blocked).toBe(15);
+      expect(p.blocked).toBe(STRIPE_EVENTS + MAIN_EVENTS);
     }
   });
 
@@ -388,7 +409,7 @@ describe("đơn đi qua nhiều cổng thanh toán", () => {
     expect(p.blocked).toBe(0);
     // Chỉ xóa event chưa post của 4 đơn Stripe đã chuyển hẳn sang ONTARIO; event ZENIROXPAY của đơn tách được build lại
     const removed = db.filter((e) => p.remove.includes(e.AccountingEventID));
-    expect(removed).toHaveLength(12);
+    expect(removed).toHaveLength(STRIPE_EVENTS);
     expect(removed.every((e) => stripeOrderIds.has(e.OrderID!) && e.ComCode === "ZENIROXPAY")).toBe(true);
     expect(p.replace.find((r) => r.id === oldZenProduct.AccountingEventID)!.draft).toMatchObject({ ComCode: "ZENIROXPAY", Amount: 34.99 });
     expect(p.insert.filter((e) => e.OrderID === MAIN_ORDER).map((e) => [e.ComCode, e.Amount])).toEqual([

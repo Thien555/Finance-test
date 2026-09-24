@@ -2,14 +2,11 @@ import Decimal from "decimal.js";
 import { describe, expect, it } from "vitest";
 import { amountFromSource, type BankSourceSpec, buildBankEvents } from "@/lib/engine/build-bank";
 import { classifyOf, postEvents } from "@/lib/engine/post";
-import { accountingSourceSpec } from "@/lib/engine/sources/accounting-source";
 import { paypalSpec, PAYPAL_DEFAULT_BANK_ACCOUNT } from "@/lib/engine/sources/paypal";
 import { pipoAmountExcludesFee, pipoSpec, PIPO_DEFAULT_BANK_ACCOUNT } from "@/lib/engine/sources/pipo";
 import { stripeSpec, STRIPE_DEFAULT_BANK_ACCOUNT } from "@/lib/engine/sources/stripe";
-import { signedAmount } from "@/lib/sources/normalize";
 import {
   loadIndex,
-  loadSampleAccountingSource,
   loadSamplePaypal,
   loadSamplePipo,
   loadSampleStripe,
@@ -17,6 +14,16 @@ import {
 } from "../helpers/fixtures";
 
 const index = loadIndex();
+
+/** Mọi chứng từ phải cân Nợ = Có, không chỉ tổng toàn bộ */
+function expectBalancedByDocument(lines: { DocNum: string; AccountedDr?: number | null; AccountedCr?: number | null }[]) {
+  const byDoc = new Map<string, Decimal>();
+  for (const l of lines) {
+    const delta = new Decimal(l.AccountedDr ?? 0).minus(l.AccountedCr ?? 0);
+    byDoc.set(l.DocNum, (byDoc.get(l.DocNum) ?? new Decimal(0)).plus(delta));
+  }
+  expect([...byDoc].filter(([, v]) => !v.toDecimalPlaces(2).isZero())).toEqual([]);
+}
 
 /** Build rồi post cả Single lẫn Bulk, trả tổng Nợ/Có để kiểm cân đối */
 function buildAndPost<R>(rows: R[], spec: BankSourceSpec<R>) {
@@ -52,23 +59,12 @@ describe("amountFromSource", () => {
   });
 });
 
-describe("signedAmount (BalanceImpact → dấu)", () => {
-  it("Debit = tiền ra → âm; Credit = tiền vào → dương; luôn lấy trị tuyệt đối của Amount", () => {
-    expect(signedAmount(6, "Debit")).toBe(-6);
-    expect(signedAmount(6, "Credit")).toBe(6);
-    expect(signedAmount(-6, "Debit")).toBe(-6);
-    expect(signedAmount(-6, "Credit")).toBe(6);
-    expect(signedAmount(6, null)).toBe(6);
-    expect(signedAmount(null, "Debit")).toBeNull();
-  });
-});
-
 describe("Build PayPal", () => {
   it("sinh event theo rule, bỏ rule thiếu TransAccount / fee = 0", async () => {
     const rows = await loadSamplePaypal();
     const r = buildBankEvents(rows, paypalSpec, index);
 
-    expect(r.stats.sourceRows).toBe(81);
+    expect(r.stats.sourceRows).toBe(142_659);
     expect(r.stats.skippedRows).toBe(0);
     // 1 dòng "General Currency Conversion": master chỉ có PP_USER_INITIATED_CURRENCY_CONVERSION
     expect(r.stats.errorRows).toBe(1);
@@ -78,7 +74,8 @@ describe("Build PayPal", () => {
 
     // Hold/Release: Contra = 11202052, TransAccount NULL → chỉ còn rule 10
     const hold = r.events.filter((e) => e.JournalTypeCode === "PP_RESERVE_HOLD");
-    expect(hold.map((e) => e.EventSeq)).toEqual([10, 10, 10, 10]);
+    expect(hold).toHaveLength(53_854);
+    expect(hold.every((e) => e.EventSeq === 10)).toBe(true);
     expect(hold[0].BankGLAccount).toBe("11202051");
     expect(hold[0].ContraAccount).toBe("11202052");
     expect(hold[0].BankAccountNumber).toBe(PAYPAL_DEFAULT_BANK_ACCOUNT);
@@ -110,10 +107,14 @@ describe("Build PayPal", () => {
     const rows = await loadSamplePaypal();
     const { built, glLines, totalDr, totalCr, failed, noClassify } = buildAndPost(rows, paypalSpec);
 
-    expect(built.stats.events).toBe(113);
+    expect(built.stats.events).toBe(198_243);
     expect(failed).toEqual([]);
     expect(noClassify).toEqual([]);
     expect(totalDr).toBe(totalCr);
+    expect(totalDr).toBe(6_986_394.87);
+    expect(glLines).toHaveLength(10_260);
+    expect(new Set(glLines.map((l) => l.DocNum)).size).toBe(4_778);
+    expectBalancedByDocument(glLines);
 
     const single = glLines.find((l) => l.DocNum.startsWith("ASI-"))!;
     expect(single.BankAccountNumber).toBe(PAYPAL_DEFAULT_BANK_ACCOUNT);
@@ -154,11 +155,15 @@ describe("Build Stripe", () => {
   });
 
   it("post ra chứng từ cân", async () => {
-    const { built, totalDr, totalCr, failed, noClassify } = buildAndPost(await loadSampleStripe(), stripeSpec);
-    expect(built.stats.events).toBe(71);
+    const { built, glLines, totalDr, totalCr, failed, noClassify } = buildAndPost(await loadSampleStripe(), stripeSpec);
+    expect(built.stats.events).toBe(2_712);
     expect(failed).toEqual([]);
     expect(noClassify).toEqual([]);
     expect(totalDr).toBe(totalCr);
+    expect(totalDr).toBe(123_799.26);
+    expect(glLines).toHaveLength(928);
+    expect(new Set(glLines.map((l) => l.DocNum)).size).toBe(287);
+    expectBalancedByDocument(glLines);
   });
 });
 
@@ -166,10 +171,12 @@ describe("Build PIPO", () => {
   it("bỏ dòng Status ≠ Success", async () => {
     const rows = await loadSamplePipo();
     const r = buildBankEvents(rows, pipoSpec, index);
-    expect(r.stats.skippedRows).toBe(2);
-    const skip = r.exceptions.find((e) => e.ExceptionType === "SOURCE_ROW_SKIPPED");
-    expect(skip?.Severity).toBe("INFO");
-    expect(skip?.Message).toContain("Retrieved");
+    // 2 dòng "Retrieved" + 1 dòng Status trống; exception gom nhóm nên chỉ 2 dòng log
+    expect(r.stats.skippedRows).toBe(3);
+    const skips = r.exceptions.filter((e) => e.ExceptionType === "SOURCE_ROW_SKIPPED");
+    expect(skips).toHaveLength(2);
+    expect(skips.every((e) => e.Severity === "INFO")).toBe(true);
+    expect(skips.some((e) => e.Message?.includes("Retrieved"))).toBe(true);
   });
 
   it("dùng JournalType của DataSource = PIPO (TK ngân hàng PingPong 11202061)", async () => {
@@ -198,76 +205,14 @@ describe("Build PIPO", () => {
   });
 
   it("post ra chứng từ cân", async () => {
-    const { built, totalDr, totalCr, failed, noClassify } = buildAndPost(await loadSamplePipo(), pipoSpec);
-    expect(built.stats.events).toBe(48);
+    const { built, glLines, totalDr, totalCr, failed, noClassify } = buildAndPost(await loadSamplePipo(), pipoSpec);
+    expect(built.stats.events).toBe(968);
     expect(failed).toEqual([]);
     expect(noClassify).toEqual([]);
     expect(totalDr).toBe(totalCr);
-  });
-});
-
-describe("Build AccountingSource", () => {
-  it("Master Card: 39 dòng → Nợ 11202091 (thẻ) / Có 11202061 (PingPong), tổng 1.076,87 USD", async () => {
-    const rows = await loadSampleAccountingSource("master-card-sample.csv", "Master Card");
-    const { built, glLines, totalDr, totalCr, failed } = buildAndPost(rows, accountingSourceSpec);
-
-    expect(built.stats.sourceRows).toBe(39);
-    expect(built.stats.errorRows).toBe(0);
-    expect(built.stats.events).toBe(39);
-    expect(failed).toEqual([]);
-    expect(totalDr).toBe(1076.87);
-    expect(totalCr).toBe(1076.87);
-
-    // BankGLAccount đến từ MappingBankAccount theo số thẻ, Contra là mặc định của sheet Master Card
-    const e = built.events[0];
-    expect(e.BankGLAccount).toBe("11202091");
-    expect(e.ContraAccount).toBe("11202061");
-    expect(e.Amount).toBeGreaterThan(0); // Credit = tiền vào thẻ
-    expect(glLines.filter((l) => l.AccountCode === "11202091" && (l.AccountedDr ?? 0) > 0).length).toBe(39);
-  });
-
-  it("Bank_Royal: tài khoản ghi trên dòng thắng mặc định JournalType, BalanceImpact quyết định chiều", async () => {
-    const rows = await loadSampleAccountingSource("bank-royal-sample.csv", "Bank_Royal");
-    const r = buildBankEvents(rows, accountingSourceSpec, index);
-
-    expect(r.stats.sourceRows).toBe(31);
-    expect(r.stats.errorRows).toBe(0);
-
-    // BANK_PAYMENT_SUPPLIER dùng 2 cặp Contra/Trans khác nhau, đều khác mặc định 33111002 của master
-    const supplier = r.events.filter((e) => e.JournalTypeCode === "BANK_PAYMENT_SUPPLIER");
-    expect([...new Set(supplier.map((e) => `${e.ContraAccount}/${e.TransAccount}`))].sort()).toEqual([
-      "33102002/64202002",
-      "33402001/64202001",
-    ]);
-    // Debit = tiền ra khỏi ngân hàng → Amount âm → rule REVERSE sẽ đảo Nợ/Có khi post
-    expect(supplier.every((e) => e.Amount < 0)).toBe(true);
-
-    const transferIn = r.events.filter((e) => e.JournalTypeCode === "BANK_INTERNAL_TRANSFER_FROM");
-    expect(transferIn.every((e) => e.Amount > 0)).toBe(true);
-    expect([...new Set(transferIn.map((e) => e.ContraAccount))].sort()).toEqual(["11202053", "11202061"]);
-  });
-
-  it("Bank_Royal là nguồn CAD → post quy đổi sang USD theo tỷ giá của kỳ", async () => {
-    const rows = await loadSampleAccountingSource("bank-royal-sample.csv", "Bank_Royal");
-    const { built, glLines, totalDr, totalCr, failed } = buildAndPost(rows, accountingSourceSpec);
-
-    expect(built.events.every((e) => e.InputCurr === "CAD" && e.FncCurr === "USD")).toBe(true);
-    expect(failed).toEqual([]);
-    expect(totalDr).toBe(totalCr);
-
-    // Exrate 202508 CAD→USD là DIV 1.3802 → AccountedDr nhỏ hơn InputDr
-    const fee = glLines.find((l) => l.Period === "202508" && (l.InputDr ?? 0) > 0)!;
-    expect(fee.RateType).toBe("DIV");
-    expect(fee.XRate).toBeCloseTo(1.3802, 4);
-    expect(fee.AccountedDr).toBeCloseTo((fee.InputDr ?? 0) / 1.3802, 2);
-  });
-
-  it("SourceKey của Bank_Royal ổn định và tách được 2 dòng trùng y hệt", async () => {
-    const rows = await loadSampleAccountingSource("bank-royal-sample.csv", "Bank_Royal");
-    const keys = rows.map((r) => r.SourceKey);
-    expect(new Set(keys).size).toBe(keys.length);
-    // Bank_Royal không có RefNum nào → khóa là hash nội dung + số thứ tự lần xuất hiện
-    expect(keys.every((k) => k.startsWith("RB|"))).toBe(true);
-    expect(keys.some((k) => k.endsWith("#2"))).toBe(true);
+    expect(totalDr).toBe(3_223_254.07);
+    expect(glLines).toHaveLength(1_936);
+    expect(new Set(glLines.map((l) => l.DocNum)).size).toBe(968);
+    expectBalancedByDocument(glLines);
   });
 });

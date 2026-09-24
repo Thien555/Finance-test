@@ -41,9 +41,9 @@ export const GL_FIELD_DOCS: Record<string, string> = {
 export const EVENT_FIELD_DOCS: Record<string, string> = {
   AccountingEventID: "Khóa event. 1 event = 1 giao dịch nguồn × 1 JournalLineRule (1 cặp Nợ/Có).",
   ComCode: "Công ty ghi sổ (= cổng thanh toán).",
-  DataSource: "Nguồn sinh ra event: ORDERS, PAYPAL, STRIPE, PIPO, ACCOUNTINGSOURCE (2 sheet Master Card + Bank_Royal).",
+  DataSource: "Nguồn sinh ra event: ORDERS, PAYPAL, STRIPE, PIPO.",
   JournalTypeCode: "Nghiệp vụ. Orders: 1 đơn fulfilled sinh tối đa 4 nghiệp vụ (PRODUCT, SHIPADD, TAX, SELLER_PROFIT). Nguồn ngân hàng/PSP: lấy từ cột JournalType điền tay trên file.",
-  TransactionID: "Mã giao dịch. Orders: ORD-{OrderId}-{yyyyMMdd FulfilledAt}. Nguồn ngân hàng/PSP: mã giao dịch gốc trên file (Bank_Royal không có mã nên dùng SourceKey).",
+  TransactionID: "Mã giao dịch. Orders: ORD-{OrderId}-{yyyyMMdd FulfilledAt}. Nguồn ngân hàng/PSP: mã giao dịch gốc trên file.",
   EventSeq: "= JournalLineRule.RuleSeq, dùng để join lại rule khi Post.",
   LineSeq: "Thứ tự dòng trong event (luôn 1).",
   PairCode: "Cặp bút toán của rule: CONTRA_TRANS, BANK_CONTRA, FEE_BANK...",
