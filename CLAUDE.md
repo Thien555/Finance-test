@@ -22,6 +22,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 - `src/app/**/page.tsx` – màn hình client antd; helper ở `src/components/client.ts`, `src/components/ui.tsx`
 - `src/lib/db/schema.ts` – 18 bảng, tên cột giữ đúng như sheet (kể cả khoảng trắng và typo `BankAccoutNumber`) · `drizzle/` – migration
 - `tests/` – vitest (engine + integration trên DB tạm) · `data/seed/` – master CSV · `data/samples/` – **4 file dữ liệu thật** (`order-data.csv`, `Bank_Paypal.csv`, `Bank_Stripe.csv`, `Bank_Pipo.csv`) + 3 CSV tham chiếu
+- `docs/` – `DEVELOPER_GUIDE.md` (kỹ thuật), `BA_PREFILL_SOURCES.md` (đặc tả PREFILL cho dev) · `docs/Docs-BA/` – tài liệu BA (yêu cầu gốc, BA tổng thể, PREFILL) · `docs/Mapping/` – một dòng nguồn ra Nợ/Có nào, 4 nguồn
 
 ## Quy tắc bắt buộc
 
@@ -42,6 +43,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 
 | Việc | Mục |
 |---|---|
+| Tổng thể nghiệp vụ, trạng thái từng chức năng so với tài liệu gốc (BA, không code) | [`docs/Docs-BA/BA_ACCOUNTING_ENGINE.md`](docs/Docs-BA/BA_ACCOUNTING_ENGINE.md) |
 | Import file, parse số/ngày | §6.1 |
 | Công thức sinh event, map seller/ComCode | §6.2 |
 | Nợ/Có, Single/Bulk, DocNum, tỷ giá | §6.3 |
@@ -49,7 +51,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 | API | §7 |
 | UI/antd | §8 |
 | Build PayPal/Stripe/PIPO | §6.11 |
-| Một dòng sao kê PayPal/Stripe/PingPong ra Nợ/Có nào (có ví dụ, số liệu thật) | [`docs/MAPPING_PAYPAL_TO_GLTRANS.md`](docs/MAPPING_PAYPAL_TO_GLTRANS.md) · [`STRIPE`](docs/MAPPING_STRIPE_TO_GLTRANS.md) · [`PIPO`](docs/MAPPING_PIPO_TO_GLTRANS.md) |
+| Một dòng sao kê PayPal/Stripe/PingPong ra Nợ/Có nào (có ví dụ, số liệu thật) | [`docs/Mapping/MAPPING_PAYPAL_TO_GLTRANS.md`](docs/Mapping/MAPPING_PAYPAL_TO_GLTRANS.md) · [`STRIPE`](docs/Mapping/MAPPING_STRIPE_TO_GLTRANS.md) · [`PIPO`](docs/Mapping/MAPPING_PIPO_TO_GLTRANS.md) |
 | Điền trước `JournalType`/`StoreName`/`PartnerCode`/`PartnerTaxID`/`ComCode` cho file sao kê thô, tự đề xuất partner thiếu (PREFILL, **chưa code**) | [`docs/BA_PREFILL_SOURCES.md`](docs/BA_PREFILL_SOURCES.md) |
 | Thêm nguồn dữ liệu mới | §11.1 |
 | Lỗi thường gặp, câu SQL soi dữ liệu | §12 |

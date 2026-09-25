@@ -3,7 +3,7 @@
 > Tài liệu giải thích **từng bước biến đổi dữ liệu** của nguồn `ORDERS` trong Sky Finance, kèm **số liệu thật** do chính code của repo sinh ra.
 > Mục tiêu: đọc xong, bạn tự lần được bất kỳ dòng GLTrans nào về đúng dòng order gốc, và hiểu vì sao nó ra Nợ/Có như vậy.
 >
-> Tài liệu kỹ thuật tổng quát: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md). Yêu cầu nghiệp vụ gốc: [`tai lieu du an.md`](../tai%20lieu%20du%20an.md).
+> Tài liệu kỹ thuật tổng quát: [`DEVELOPER_GUIDE.md`](../DEVELOPER_GUIDE.md). Yêu cầu nghiệp vụ gốc: [`tai lieu du an.md`](../../tai%20lieu%20du%20an.md).
 
 ---
 
@@ -187,7 +187,7 @@ Với file mẫu:
                    (4 dòng UNFULFILLED bị bỏ qua)     (240 khả năng − 66 khoản bằng 0)
 ```
 
-Bản vẽ của cùng nội dung này, kèm cả 15 bảng và các cột dùng để nối: [`BA_ORDERS_TO_GLTRANS.md` § Sơ đồ quan hệ dữ liệu](BA_ORDERS_TO_GLTRANS.md#sơ-đồ-quan-hệ-dữ-liệu).
+Danh sách đủ 18 bảng (vai trò, khóa, bước ghi): [`BA_ACCOUNTING_ENGINE.md` mục 21](../Docs-BA/BA_ACCOUNTING_ENGINE.md#21-bảng-dữ-liệu).
 
 ### 2.3. Ví dụ xuyên suốt
 

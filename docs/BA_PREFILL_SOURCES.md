@@ -2,7 +2,8 @@
 
 > Tài liệu này vừa là **đặc tả BA** vừa là **đặc tả để AI/dev viết code** cho bước **PREFILL**. Bước này **chưa có trong code**: nó tự điền các cột phân loại vào file sao kê thô trước khi Import, và đề xuất partner còn thiếu cho master.
 >
-> - Sau khi Import, dữ liệu đi tiếp theo luồng mô tả ở: [`BA_ORDERS_TO_GLTRANS.md`](BA_ORDERS_TO_GLTRANS.md) · [`MAPPING_PAYPAL_TO_GLTRANS.md`](MAPPING_PAYPAL_TO_GLTRANS.md) · [`MAPPING_STRIPE_TO_GLTRANS.md`](MAPPING_STRIPE_TO_GLTRANS.md) · [`MAPPING_PIPO_TO_GLTRANS.md`](MAPPING_PIPO_TO_GLTRANS.md).
+> - Bản đặc tả nghiệp vụ để mọi người đọc và duyệt (không có phần kỹ thuật, không có số liệu đo): [`BRD_PREFILL.md`](Docs-BA/BRD_PREFILL.md).
+> - Sau khi Import, dữ liệu đi tiếp theo luồng mô tả ở: [`BA_ACCOUNTING_ENGINE.md`](Docs-BA/BA_ACCOUNTING_ENGINE.md) · [`MAPPING_PAYPAL_TO_GLTRANS.md`](Mapping/MAPPING_PAYPAL_TO_GLTRANS.md) · [`MAPPING_STRIPE_TO_GLTRANS.md`](Mapping/MAPPING_STRIPE_TO_GLTRANS.md) · [`MAPPING_PIPO_TO_GLTRANS.md`](Mapping/MAPPING_PIPO_TO_GLTRANS.md).
 > - Bản kỹ thuật của engine: [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) §6.2.1 (resolve seller), §6.11 (3 nguồn ngân hàng).
 > - Nguồn yêu cầu: quy tắc điền cột, tra store qua Bettamax, `idStore`, payout Stripe → `Pingpong ZeniroxPay` là **yêu cầu của kế toán ngày 2026-09-24**. Tài liệu gốc `tai lieu du an.md` §7.3–7.6 chỉ mô tả engine sau Import, không có phần điền cột.
 

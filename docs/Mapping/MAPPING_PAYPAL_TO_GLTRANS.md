@@ -4,7 +4,7 @@
 > do chính code của repo sinh ra trên `paypal-sample.csv` — bản trích 81 dòng của file thật, **đã gỡ khỏi repo**. Cách ánh xạ dưới đây không đổi; tổng số hiện tại của cả file xem `docs/DEVELOPER_GUIDE.md` §10.2.
 >
 > - Kiến thức kế toán cơ bản (Nợ/Có, loại tài khoản, chứng từ): [`MAPPING_ORDERS_TO_GLTRANS.md` Phần 1](MAPPING_ORDERS_TO_GLTRANS.md#phần-1--kiến-thức-kế-toán-tối-thiểu).
-> - Chi tiết kỹ thuật: [`DEVELOPER_GUIDE.md` §6.11](DEVELOPER_GUIDE.md). Yêu cầu gốc: `tai lieu du an.md` §7.4.
+> - Chi tiết kỹ thuật: [`DEVELOPER_GUIDE.md` §6.11](../DEVELOPER_GUIDE.md). Yêu cầu gốc: `tai lieu du an.md` §7.4.
 > - Hai nguồn cùng engine: [Stripe](MAPPING_STRIPE_TO_GLTRANS.md) · [PingPong](MAPPING_PIPO_TO_GLTRANS.md).
 
 ## Mục lục

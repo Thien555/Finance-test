@@ -3,7 +3,7 @@
 > Tài liệu kỹ thuật cho người/AI tiếp tục phát triển hoặc fix bug. Viết tiếng Việt, giữ nguyên tên bảng/cột/hàm/file.
 > **Quy tắc:** khi thay đổi hành vi code, cập nhật mục tương ứng trong file này cùng lúc.
 > Tài liệu nghiệp vụ gốc (yêu cầu tổng thể, chưa làm hết): [`tai lieu du an.md`](../tai%20lieu%20du%20an.md).
-> Đặc tả nghiệp vụ ngắn (BA) cho luồng Order → GLTrans, có sơ đồ tổng quan: [`BA_ORDERS_TO_GLTRANS.md`](BA_ORDERS_TO_GLTRANS.md).
+> Đặc tả nghiệp vụ tổng thể (BA) cho cả 4 nguồn, có sơ đồ luồng: [`BA_ACCOUNTING_ENGINE.md`](Docs-BA/BA_ACCOUNTING_ENGINE.md).
 
 ## Mục lục
 
@@ -311,7 +311,7 @@ Không có foreign key; liên kết qua giá trị:
 | `GLTrans.PostBatchID` | `PostingBatch.PostBatchID` | notNull |
 | `ExceptionLog.BatchType` + `BatchID` | `BuildBatch` / `PostingBatch` | Polymorphic; `IMPORT` chưa có caller |
 
-Sơ đồ toàn cảnh 15 bảng + ERD 5 bảng lõi: [`BA_ORDERS_TO_GLTRANS.md` § Sơ đồ quan hệ dữ liệu](BA_ORDERS_TO_GLTRANS.md#sơ-đồ-quan-hệ-dữ-liệu). Chuỗi tra cứu master: [`MAPPING_ORDERS_TO_GLTRANS.md` §12.1](MAPPING_ORDERS_TO_GLTRANS.md).
+Bảng tổng hợp 18 bảng (vai trò, khóa, bước ghi): [`BA_ACCOUNTING_ENGINE.md` mục 21](Docs-BA/BA_ACCOUNTING_ENGINE.md#21-bảng-dữ-liệu). Chuỗi tra cứu master: [`MAPPING_ORDERS_TO_GLTRANS.md` §12.1](Mapping/MAPPING_ORDERS_TO_GLTRANS.md).
 
 ### 4.3 Kết nối, migrate, seed
 - `getDb()` (`src/lib/db/client.ts`): mở `DATABASE_PATH` hoặc `data/finance.db`, bật WAL, chạy `migrate()` với `drizzle/`, gọi `seedMastersIfEmpty()` (nếu `JournalType` rỗng → nạp snapshot 6 bảng sheet; bảng `Company`/`GatewayCompanyMapping` nào rỗng → nạp từ `company.csv`/`gateway-company-mapping.csv`; bảng đã có dữ liệu thì không đụng). Instance cache trên `globalThis.__financeDb` (sống qua HMR).
@@ -636,9 +636,9 @@ Hàm rời: `parsePartnerRule("Fixed = Individuals")` → `{mode:"FIXED", code:"
 Tài liệu gốc: §7.4 PayPal, §7.5 PIPO, §7.6 Stripe. Dữ liệu thật: `data/samples/Bank_{Paypal,Stripe,Pipo}.csv`.
 
 > **Bản giải thích cho kế toán/BA, lần theo số liệu thật của file mẫu:**
-> [`MAPPING_PAYPAL_TO_GLTRANS.md`](MAPPING_PAYPAL_TO_GLTRANS.md) ·
-> [`MAPPING_STRIPE_TO_GLTRANS.md`](MAPPING_STRIPE_TO_GLTRANS.md) ·
-> [`MAPPING_PIPO_TO_GLTRANS.md`](MAPPING_PIPO_TO_GLTRANS.md).
+> [`MAPPING_PAYPAL_TO_GLTRANS.md`](Mapping/MAPPING_PAYPAL_TO_GLTRANS.md) ·
+> [`MAPPING_STRIPE_TO_GLTRANS.md`](Mapping/MAPPING_STRIPE_TO_GLTRANS.md) ·
+> [`MAPPING_PIPO_TO_GLTRANS.md`](Mapping/MAPPING_PIPO_TO_GLTRANS.md).
 > Mục này là bản kỹ thuật; ba tài liệu kia có ví dụ từng dòng Nợ/Có và bảng cân đối của từng nguồn.
 >
 > **Các cột điền tay** (`JournalType`, `StoreName`, `PartnerCode`, `ComCode`) được điền theo công thức nào, và đặc tả bước tự điền PREFILL (chưa code): [`BA_PREFILL_SOURCES.md`](BA_PREFILL_SOURCES.md).
