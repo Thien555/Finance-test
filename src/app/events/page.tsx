@@ -4,7 +4,7 @@ import { BuildOutlined, DownloadOutlined, ReloadOutlined, RollbackOutlined } fro
 import { Alert, App, Button, Card, Descriptions, Drawer, Input, Select, Space, Table, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { money, postJson, toQuery, useApi, useOptions } from "@/components/client";
-import { columnsOf, type ScopeValue, ScopeBar, StatusTag } from "@/components/ui";
+import { columnsOf, LockedPeriodsAlert, type ScopeValue, ScopeBar, StatusTag } from "@/components/ui";
 import type { AccountingEventRow, GLTransRow, JournalLineRuleRow, JournalTypeRow, RawOrderRow } from "@/lib/db/schema";
 import { EVENT_FIELD_DOCS, GL_FIELD_DOCS } from "@/lib/field-docs";
 import type { BuildSummary } from "@/lib/services/build";
@@ -56,26 +56,31 @@ export default function EventsPage() {
         title: `Build xong (BuildBatchID ${r.BuildBatchID})`,
         width: 560,
         content: (
-          <Descriptions
-            size="small"
-            column={1}
-            bordered
-            items={[
-              { label: "Phạm vi", children: r.scope },
-              { label: "Dòng raw đọc", children: r.SourceRows },
-              { label: "Dòng đủ điều kiện build", children: r.FulfilledRows },
-              { label: "Dòng bị bỏ qua (chưa fulfill / bị lọc)", children: r.SkippedRows },
-              { label: "Dòng lỗi mapping", children: r.ErrorRows },
-              { label: "Event tạo mới", children: r.EventsCreated },
-              { label: "Event thay thế (chưa post)", children: r.EventsReplaced },
-              { label: "Event đã POSTED giữ nguyên", children: r.EventsUnchangedPosted },
-              { label: "Event cũ bị xóa (không còn sinh ra, chưa post)", children: r.EventsRemoved },
-              { label: "Event bị chặn (đã POSTED dưới khóa khác)", children: r.EventsBlocked },
-              { label: "Event ERROR", children: r.EventsError },
-              { label: "Bỏ qua do amount = 0", children: r.ZeroAmountSkipped },
-              { label: "Exception ghi nhận", children: r.Exceptions },
-            ]}
-          />
+          <Space orientation="vertical" style={{ width: "100%" }}>
+            <LockedPeriodsAlert periods={r.LockedPeriods} what={buildLockedWhat(r)} />
+            <Descriptions
+              size="small"
+              column={1}
+              bordered
+              items={[
+                { label: "Phạm vi", children: r.scope },
+                { label: "Dòng raw đọc", children: r.SourceRows },
+                { label: "Dòng đủ điều kiện build", children: r.FulfilledRows },
+                { label: "Dòng bị bỏ qua (chưa fulfill / bị lọc)", children: r.SkippedRows },
+                { label: "Dòng lỗi mapping", children: r.ErrorRows },
+                { label: "Event tạo mới", children: r.EventsCreated },
+                { label: "Event thay thế (chưa post)", children: r.EventsReplaced },
+                { label: "Event đã POSTED giữ nguyên", children: r.EventsUnchangedPosted },
+                { label: "Event cũ bị xóa (không còn sinh ra, chưa post)", children: r.EventsRemoved },
+                { label: "Event bị chặn (đã POSTED dưới khóa khác)", children: r.EventsBlocked },
+                { label: "Event ERROR", children: r.EventsError },
+                { label: "Bỏ qua do amount = 0", children: r.ZeroAmountSkipped },
+                { label: "Bỏ qua do kỳ khóa (giữ nguyên)", children: `${r.LockedSkipped} event · ${r.LockedRows} dòng raw` },
+                { label: "Chặn do đụng kỳ khóa (ERROR PERIOD_LOCKED)", children: r.LockedConflicts },
+                { label: "Exception ghi nhận", children: r.Exceptions },
+              ]}
+            />
+          </Space>
         ),
       });
       await list.reload();
@@ -90,6 +95,19 @@ export default function EventsPage() {
     setBusy(includePosted ? "unpostUnbuild" : "unbuild");
     try {
       const p = await postJson<UnbuildResult>("/api/unbuild", { ...scope, includePosted, preview: true });
+      // Phần thuộc kỳ khóa sổ luôn giữ nguyên; chứng từ khóa chỉ có khi kèm Unpost
+      const lockedDocs = p.unposted?.lockedDocuments ?? 0;
+      const lockedPeriods = [...new Set([...p.lockedPeriods, ...(p.unposted?.lockedPeriods ?? [])])].sort();
+      const lockedKept = `Giữ nguyên ${p.lockedEvents} event, ${p.lockedRawRows} dòng raw${includePosted ? `, ${lockedDocs} chứng từ` : ""}`;
+      const anyLocked = p.lockedEvents > 0 || p.lockedRawRows > 0 || lockedDocs > 0;
+      const nothingToDo = p.deletedEvents === 0 && p.rawRowsReset === 0 && p.postedEventsKept === 0 && !p.unposted?.events;
+      if (anyLocked && nothingToDo) {
+        const shown = lockedPeriods.length ? ` (${lockedPeriods.map((k) => k.replace("|", " ")).join(", ")})` : "";
+        message.warning(
+          `Mọi dữ liệu trong phạm vi thuộc kỳ đã khóa sổ${shown} → không có gì để ${includePosted ? "Unpost + Unbuild" : "Unbuild"}. ${lockedKept}; muốn làm lại thì mở khóa ở trang Kỳ kế toán.`,
+        );
+        return;
+      }
       modal.confirm({
         title: includePosted ? "Unpost + Unbuild?" : "Unbuild?",
         content: (
@@ -101,7 +119,14 @@ export default function EventsPage() {
             )}
             <span>Xóa {p.deletedEvents} AccountingEvent</span>
             <span>{p.rawRowsReset} dòng raw về NOT_BUILT</span>
-            {p.postedEventsKept > 0 && <Alert type="warning" showIcon title={`${p.postedEventsKept} event đã POSTED sẽ giữ lại (cần Unpost trước)`} />}
+            {p.postedEventsKept > 0 && (
+              <Alert
+                type="warning"
+                showIcon
+                title={`${p.postedEventsKept} event đã POSTED sẽ giữ lại (cần Unpost trước); dòng raw của chúng giữ BUILT nên chưa import lại được`}
+              />
+            )}
+            {anyLocked && <LockedPeriodsAlert periods={lockedPeriods} what={lockedKept} />}
           </Space>
         ),
         okText: "Chạy",
@@ -294,6 +319,14 @@ function EventDetailView({ d }: { d: EventDetail }) {
       )}
     </Space>
   );
+}
+
+/** Tiêu đề cảnh báo kỳ khóa của kết quả Build, VD "Build bỏ qua 12 event (30 dòng raw), chặn 2 event đụng dữ liệu" */
+function buildLockedWhat(r: BuildSummary) {
+  const parts: string[] = [];
+  if (r.LockedSkipped > 0 || r.LockedRows > 0) parts.push(`bỏ qua ${r.LockedSkipped} event (${r.LockedRows} dòng raw)`);
+  if (r.LockedConflicts > 0) parts.push(`chặn ${r.LockedConflicts} event đụng dữ liệu`);
+  return `Build ${parts.join(", ") || "bỏ qua phần"}`;
 }
 
 function accountOf(source: string | null, e: AccountingEventRow) {

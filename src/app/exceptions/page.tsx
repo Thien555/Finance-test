@@ -35,9 +35,11 @@ const TYPE_DOCS: Record<string, string> = {
   POSTED_SOURCE_CHANGED:
     "Event đã post nhưng dữ liệu nguồn/cấu hình đổi, hoặc lần Build này không còn sinh ra event đó (số tiền về 0, rule tắt, gateway mất mapping, đổi ngày giao) → Unpost + Build + Post lại nếu cần.",
   POSTED_KEY_CHANGED:
-    "Item đã ghi sổ nhưng khóa event đổi (đổi GatewayCompanyMapping sang ComCode khác, đổi RuleSeq, đổi ngày giao...) → event mới bị giữ ERROR để không ghi sổ trùng. Unpost theo ComCode + kỳ cũ nêu trong message rồi Build (gồm cả kỳ/ComCode mới nếu message ghi) + Post lại; Build tự xóa event cũ không còn dòng nguồn.",
+    "Item / dòng nguồn đã ghi sổ nhưng khóa event đổi (Orders: đổi GatewayCompanyMapping sang ComCode khác, đổi RuleSeq, đổi ngày giao...; PayPal / Stripe / PIPO: dòng sao kê bị phân loại lại sang JournalType khác, đổi ComCode) → event mới bị giữ ERROR để không ghi sổ trùng. Unpost theo ComCode + kỳ cũ nêu trong message rồi Build (gồm cả kỳ/ComCode mới nếu message ghi) + Post lại; Build tự xóa event cũ không còn dòng nguồn.",
   DUPLICATE_ITEM:
     "Chốt chặn lúc Post: item của event đã ghi sổ (hoặc đang chờ post) ở event khác ngày giao / khác công ty, hoặc event tạo trước khi có cột ItemCodes → không post. Build lại (phạm vi gồm cả event kia) để đối chiếu rồi Post.",
+  PERIOD_LOCKED:
+    "Công ty × kỳ đã khóa sổ (trang Kỳ kế toán). INFO: tóm tắt số dòng nguồn / event mà lệnh Build (hoặc Post) bỏ qua vì thuộc kỳ khóa — mỗi nguồn × công ty × kỳ 1 dòng, thay mới mỗi lần chạy (không cộng dồn); bình thường, dữ liệu kỳ khóa giữ nguyên. ERROR: dòng ở kỳ mở đụng event thuộc kỳ khóa (dòng nguồn đổi ngày / đổi cổng sang kỳ khác, hoặc trùng item) → không ghi để tránh ghi sổ trùng. Muốn sửa: mở khóa kỳ đó (ghi lý do), Unpost/Unbuild kỳ đó, Build + Post lại rồi khóa lại.",
 };
 
 export default function ExceptionsPage() {

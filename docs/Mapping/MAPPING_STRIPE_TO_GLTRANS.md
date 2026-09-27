@@ -104,7 +104,10 @@ SourceKey = {id}        VD: txn_3SVBh2K3ZXYJSkRp1IOqhT0v
 
 Đơn giản nhất trong 3 nguồn: `id` của Stripe duy nhất tuyệt đối, không cần ghép thêm gì.
 `SourceKey` **không chứa cột người dùng điền tay**, nên sửa tay `JournalType` rồi import lại sẽ bị chặn
-ở tầng Import (*"Unbuild STRIPE trước khi import lại"*) — cơ chế chống ghi sổ trùng.
+ở tầng Import — cơ chế chống ghi sổ trùng. Dòng còn event đã ghi sổ: *"Dòng đã ghi sổ (event …, POSTED) … → Unpost + Unbuild
+STRIPE ComCode X kỳ P trước khi import lại"*; còn event chưa post: *"… → Unbuild STRIPE ComCode X kỳ P trước khi import lại"*.
+Unbuild không kèm Unpost giữ dòng ở `BUILT` khi event POSTED của nó còn (guide §6.11.6). Nếu dòng vẫn lọt tới Build (vd đổi danh
+mục JournalType), event đã ghi sổ của dòng chặn bản mới bằng `POSTED_KEY_CHANGED`.
 
 ### Hai quy ước dễ sập bẫy
 

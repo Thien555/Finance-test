@@ -4,15 +4,32 @@
  *  - Chia Single/Bulk theo JournalType.Classify
  *  - Chốt chặn ghi sổ trùng theo item (engine findDuplicateItems): event trùng item với event khác ngày giao/công ty → ERROR, không post
  *  - Mỗi lần post 1 loại = 1 PostingBatch
+ *  - Kỳ khóa sổ (guide §6.12): event thuộc (ComCode, Period) đang LOCKED không được post — bỏ qua, đếm vào
+ *    `LockedEvents` + 1 exception INFO PERIOD_LOCKED mỗi nguồn × công ty × kỳ (thay bản cũ mỗi lần chạy).
+ *    1 chứng từ (DocNum) luôn thuộc đúng 1 công ty × 1 kỳ (Bulk gom theo ComCode + ngày yyyyMMdd) nên lọc theo event là đủ
  */
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, count, eq, inArray, or, type SQL } from "drizzle-orm";
 import { getDb } from "@/lib/db/client";
 import { accountingEvent, glTrans, postingBatch } from "@/lib/db/schema";
 import { ORDERS_DATA_SOURCE } from "@/lib/engine/build-orders";
+import type { MasterIndex } from "@/lib/engine/masters";
 import { nowIso } from "@/lib/engine/parse";
+import { LockTally, lockKey, type PeriodLocks } from "@/lib/engine/period-lock";
 import { type Classify, classifyOf, postEvents } from "@/lib/engine/post";
 import { findDuplicateItems, type GuardEvent } from "@/lib/engine/post-guard";
-import { chunk, deleteExceptionsByKeys, describeScope, insertExceptions, loadMasterIndex, type Scope, scopeWhere } from "./common";
+import {
+  chunk,
+  deleteExceptionsByKeys,
+  describeScope,
+  insertExceptions,
+  loadMasterIndex,
+  loadPeriodLocks,
+  lockedWhere,
+  notLocked,
+  replaceLockSummaries,
+  type Scope,
+  scopeWhere,
+} from "./common";
 
 export interface PostSummary {
   Classify: Classify;
@@ -25,27 +42,73 @@ export interface PostSummary {
   SkippedEvents: number;
   Documents: number;
   InsertedRows: number;
+  /** Event chờ post (cùng loại) bị bỏ qua vì thuộc kỳ khóa sổ */
+  LockedEvents: number;
+  /** Các kỳ khóa đã bỏ qua, dạng "COMCODE|YYYYMM" (sort, không trùng) */
+  LockedPeriods: string[];
   ErrorMessage?: string;
 }
 
-export function runPost(classify: Classify | "All", scope: Scope = {}): PostSummary[] {
-  const kinds: Classify[] = classify === "All" ? ["Single", "Bulk"] : [classify];
-  return kinds.map((k) => postOne(k, scope));
+/** Phần bị bỏ qua vì kỳ khóa của 1 loại Single/Bulk */
+interface LockedPart {
+  events: number;
+  periods: Set<string>;
 }
 
-function postOne(classify: Classify, scope: Scope): PostSummary {
+/** Event chờ post: NEW, hoặc ERROR do lần post trước lỗi */
+const pendingWhere = (): SQL =>
+  or(eq(accountingEvent.PostStatus, "NEW"), and(eq(accountingEvent.PostStatus, "ERROR"), eq(accountingEvent.ErrorStage, "POST")))!;
+
+export function runPost(classify: Classify | "All", scope: Scope = {}): PostSummary[] {
   const db = getDb();
+  const kinds: Classify[] = classify === "All" ? ["Single", "Bulk"] : [classify];
   const index = loadMasterIndex(db);
+  const locks = loadPeriodLocks(db);
+
+  // Event chờ post thuộc kỳ khóa: chỉ đếm (gom theo nguồn × JournalType × công ty × kỳ), không động vào.
+  // `locked` theo từng loại đang chạy (→ PostSummary); `tally` đếm cả 2 loại để tóm tắt không đổi theo loại được chọn
+  const tally = new LockTally();
+  const locked = new Map<Classify, LockedPart>(kinds.map((k) => [k, { events: 0, periods: new Set<string>() }]));
+  if (!locks.isEmpty) {
+    const groups = db
+      .select({
+        DataSource: accountingEvent.DataSource,
+        JournalTypeCode: accountingEvent.JournalTypeCode,
+        ComCode: accountingEvent.ComCode,
+        Period: accountingEvent.Period,
+        n: count(),
+      })
+      .from(accountingEvent)
+      .where(and(...scopeWhere(accountingEvent, scope), pendingWhere(), lockedWhere(locks, accountingEvent.ComCode, accountingEvent.Period)))
+      .groupBy(accountingEvent.DataSource, accountingEvent.JournalTypeCode, accountingEvent.ComCode, accountingEvent.Period)
+      .all();
+    for (const g of groups) {
+      const classify = classifyOf(index, g);
+      if (!classify) continue; // JournalType không có Classify: không bao giờ post được, không phải "bỏ qua vì khóa"
+      tally.add(g.DataSource, g, "events", g.n);
+      const part = locked.get(classify);
+      if (!part) continue; // loại không chạy lần này
+      part.events += g.n;
+      part.periods.add(lockKey(g.ComCode, g.Period));
+    }
+  }
+
+  const out = kinds.map((k) => postOne(k, scope, index, locks, locked.get(k)!));
+
+  // Tóm tắt phần bị bỏ qua: thay bản cũ trong phạm vi (gọi cả khi rỗng để dọn tóm tắt cũ sau khi mở khóa)
+  db.transaction((tx) => {
+    replaceLockSummaries(tx, "POST", scope.dataSource ? [scope.dataSource.toUpperCase()] : null, scope, tally.toExceptions("Post"), null);
+  });
+  return out;
+}
+
+function postOne(classify: Classify, scope: Scope, index: MasterIndex, locks: PeriodLocks, locked: LockedPart): PostSummary {
+  const db = getDb();
 
   const candidates = db
     .select()
     .from(accountingEvent)
-    .where(
-      and(
-        ...scopeWhere(accountingEvent, scope),
-        or(eq(accountingEvent.PostStatus, "NEW"), and(eq(accountingEvent.PostStatus, "ERROR"), eq(accountingEvent.ErrorStage, "POST"))),
-      ),
-    )
+    .where(and(...scopeWhere(accountingEvent, scope), pendingWhere(), ...notLocked(locks, accountingEvent.ComCode, accountingEvent.Period)))
     .all()
     .filter((e) => classifyOf(index, e) === classify);
 
@@ -60,6 +123,8 @@ function postOne(classify: Classify, scope: Scope): PostSummary {
     SkippedEvents: 0,
     Documents: 0,
     InsertedRows: 0,
+    LockedEvents: locked.events,
+    LockedPeriods: [...locked.periods].sort(),
   };
   if (candidates.length === 0) {
     summary.Status = "NOTHING_TO_POST";
@@ -86,7 +151,7 @@ function postOne(classify: Classify, scope: Scope): PostSummary {
   summary.PostBatchID = batch.PostBatchID;
 
   try {
-    // Mọi event cùng DataSource + OrderID (mọi PostStatus, mọi scope) để kiểm tra item đã/đang chờ ghi sổ dưới khóa khác
+    // Mọi event cùng DataSource + OrderID (mọi PostStatus, mọi scope, cả kỳ khóa) để kiểm tra item đã/đang chờ ghi sổ dưới khóa khác
     const orderIdsBySource = new Map<string, Set<string>>();
     for (const e of candidates) {
       if (e.OrderID) orderIdsBySource.set(e.DataSource, (orderIdsBySource.get(e.DataSource) ?? new Set()).add(e.OrderID));
@@ -181,10 +246,12 @@ function postOne(classify: Classify, scope: Scope): PostSummary {
           .run();
       }
 
+      // Candidate đều ở kỳ mở; `locks` giữ lại exception cũ cùng SourceKey nếu nó còn gắn kỳ khóa
       deleteExceptionsByKeys(
         tx,
         "POST",
         candidates.map((e) => `EventID ${e.AccountingEventID} | ${e.TransactionID}`),
+        locks,
       );
       insertExceptions(tx, "POST", batch.PostBatchID, result.exceptions);
 

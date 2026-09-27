@@ -1,8 +1,9 @@
 "use client";
 
-import { QuestionCircleOutlined } from "@ant-design/icons";
-import { DatePicker, Select, Space, type TableColumnType as ColumnType, Tag, Tooltip } from "antd";
+import { LockOutlined, QuestionCircleOutlined } from "@ant-design/icons";
+import { Alert, DatePicker, Select, Space, type TableColumnType as ColumnType, Tag, Tooltip } from "antd";
 import dayjs from "dayjs";
+import Link from "next/link";
 import type { FilterOptions } from "./client";
 import { money } from "./client";
 
@@ -38,7 +39,7 @@ export function columnsOf<T extends object>(
     if (MONEY_FIELDS.has(name)) {
       base.align = "right";
       base.render = (v: number | null) => <span className="num">{money(v)}</span>;
-    } else if (["PostStatus", "Status", "BuildStatus", "Severity", "BalanceImpact", "Classify", "ItemStatus"].includes(name)) {
+    } else if (["PostStatus", "Status", "BuildStatus", "Severity", "BalanceImpact", "Classify", "ItemStatus", "Action", "FromStatus", "ToStatus"].includes(name)) {
       base.render = (v: string | null) => (v ? <StatusTag value={v} /> : null);
     }
     return { ...base, ...overrides[name] };
@@ -74,10 +75,46 @@ const COLORS: Record<string, string> = {
   Bulk: "magenta",
   FULFILLED: "green",
   UNFULFILLED: "default",
+  // Kỳ kế toán
+  OPEN: "green",
+  LOCKED: "red",
+  LOCK: "volcano",
+  UNLOCK: "cyan",
 };
 
 export function StatusTag({ value }: { value: string }) {
-  return <Tag color={COLORS[value] ?? "default"}>{value}</Tag>;
+  return (
+    <Tag color={COLORS[value] ?? "default"} icon={value === "LOCKED" ? <LockOutlined /> : undefined}>
+      {value}
+    </Tag>
+  );
+}
+
+/** "ZENIROXPAY|202511" → "ZENIROXPAY 202511" */
+const showLockKey = (key: string) => key.replace("|", " ");
+
+/**
+ * Cảnh báo "phần thuộc kỳ khóa sổ bị bỏ qua / giữ nguyên" cho kết quả Build / Post / Unpost / Unbuild / Import.
+ * `periods`: khóa "COMCODE|YYYYMM"; `what`: VD "Build bỏ qua 12 event". Không có kỳ nào → không hiện gì.
+ */
+export function LockedPeriodsAlert({ periods, what }: { periods: string[] | null | undefined; what: string }) {
+  if (!periods?.length) return null;
+  const shown = periods.slice(0, 6).map(showLockKey).join(", ");
+  const more = periods.length > 6 ? ` và ${periods.length - 6} kỳ khác` : "";
+  return (
+    <Alert
+      type="warning"
+      showIcon
+      icon={<LockOutlined />}
+      title={`${what} thuộc kỳ đã khóa sổ`}
+      description={
+        <span>
+          {shown}
+          {more}. Muốn thay đổi phần này: mở khóa ở trang <Link href="/periods">Kỳ kế toán</Link> (ghi lý do), chạy lại rồi khóa lại.
+        </span>
+      }
+    />
+  );
 }
 
 export interface ScopeValue {

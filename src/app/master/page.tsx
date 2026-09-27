@@ -2,6 +2,7 @@
 
 import { CloudSyncOutlined, DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
 import { Alert, App, AutoComplete, Button, Card, Form, Input, Modal, Popconfirm, Space, Switch, Table, Tabs, Typography } from "antd";
+import Link from "next/link";
 import { useState } from "react";
 import { deleteJson, postJson, toQuery, useApi } from "@/components/client";
 import { columnsOf } from "@/components/ui";
@@ -62,6 +63,10 @@ export default function MasterPage() {
           Master data
         </Typography.Title>
         <Typography.Text type="secondary">Cấu hình điều khiển engine. Sửa trên Google Sheet rồi bấm Sync; lần Build/Post sau sẽ dùng cấu hình mới.</Typography.Text>
+        <br />
+        <Typography.Text type="secondary">
+          Kỳ kế toán (khóa sổ) quản lý ở trang <Link href="/periods">Kỳ kế toán</Link> — không nằm trong Google Sheet, Sync không đụng tới.
+        </Typography.Text>
       </div>
 
       <Card>

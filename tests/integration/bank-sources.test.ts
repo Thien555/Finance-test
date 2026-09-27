@@ -86,8 +86,9 @@ describe("luồng nguồn ngoài Orders → GLTrans trên DB", async () => {
 
   it("sửa tay cột JournalType rồi import lại dòng đã build → bị chặn", async () => {
     // Chỉ gửi lại header + 1 dòng đã sửa: đủ để kiểm chốt chặn mà không phải import lại 142k dòng
-    const EOL = String.fromCharCode(13, 10);
-    const [header, ...lines] = sample("Bank_Paypal.csv").toString("utf8").split(EOL);
+    // File mẫu có thể là CRLF hoặc LF tùy lúc commit → tách theo cả hai
+    const EOL = "\n";
+    const [header, ...lines] = sample("Bank_Paypal.csv").toString("utf8").split(/\r?\n/);
     const target = lines.find((l) => l.includes("PP_RESERVE_HOLD"))!;
     const changed = Buffer.from([header, target.replace("PP_RESERVE_HOLD", "PP_GENERAL_HOLD")].join(EOL) + EOL, "utf8");
 

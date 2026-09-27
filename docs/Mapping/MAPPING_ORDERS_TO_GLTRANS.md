@@ -187,7 +187,7 @@ Với file mẫu:
                    (4 dòng UNFULFILLED bị bỏ qua)     (240 khả năng − 66 khoản bằng 0)
 ```
 
-Danh sách đủ 18 bảng (vai trò, khóa, bước ghi): [`BA_ACCOUNTING_ENGINE.md` mục 21](../Docs-BA/BA_ACCOUNTING_ENGINE.md#21-bảng-dữ-liệu).
+Danh sách đủ 20 bảng (vai trò, khóa, bước ghi): [`BA_ACCOUNTING_ENGINE.md` mục 21](../Docs-BA/BA_ACCOUNTING_ENGINE.md#21-bảng-dữ-liệu).
 
 ### 2.3. Ví dụ xuyên suốt
 

@@ -348,7 +348,7 @@ Không có quy tắc nào tự đề xuất partner loại OTHER. Các đối t�
 - **Không đề xuất** khi kết quả tra là `SELLER_AMBIGUOUS`, `STORE_EMAIL_MISMATCH` hoặc `SELLER_EMAIL_INVALID`. Những dòng này cần người xem.
 - Không đề xuất Seller mà email trùng `BuyerEmail` của đơn. Trên mẫu, 2 đơn nhập tay `#MS0061001`, `#MS0091001` ghi `SellerEmail` = email người mua; tạo seller cho các email này là sai.
 - Chạy lại PREFILL sau khi đã nạp partner đề xuất **nguyên văn** vào master thì **không sinh thêm đề xuất nào và không đổi ô nào**. Nhờ `latestStoreName` và `PartnerTaxID` chung cho supplier mới, điều này đúng theo cách thiết kế, không phụ thuộc dữ liệu.
-  - Nếu kế toán **sửa** đề xuất trước khi dán (đổi `PartnerName`/`PartnerTaxID` sang tên pháp nhân, thêm StoreId từ Bettamax), ô `PartnerTaxID` của các dòng đó sẽ đổi ở lần chạy sau. Phải chạy lại PREFILL trước khi Import; dòng đã Build thì phải Unbuild.
+  - Nếu kế toán **sửa** đề xuất trước khi dán (đổi `PartnerName`/`PartnerTaxID` sang tên pháp nhân, thêm StoreId từ Bettamax), ô `PartnerTaxID` của các dòng đó sẽ đổi ở lần chạy sau. Phải chạy lại PREFILL trước khi Import; dòng đã Build thì phải Unbuild (đã ghi sổ thì Unpost + Unbuild).
   - Đo trên file mẫu đã xóa trắng 5 cột (§0.4), sau khi nạp 2 đề xuất: 0/725.120 ô của 3 nguồn ngân hàng đổi (145.024 dòng × 5 cột). Seller của 52.437 dòng Orders không đổi. 0 đề xuất mới. Chỉ cờ đổi: `NEW_SELLER` chuyển thành `SELLER_NO_TAXID` (PayPal 982 → 988, Orders 482 → 485), `NEW_SUPPLIER` 1 → 0.
 
 > ⚠️ **Partner tự thêm sẽ mất khi Sync.** Nút Sync (`syncMastersFromGoogleSheet` → `replaceMasters`) **xóa toàn bộ bảng Partners rồi nạp lại từ Google Sheet**, đồng thời ghi đè `data/seed/partners.csv`. `npm run db:export-seed` không xuất Partners. Hiện cũng không có API/UI nào thêm được partner. Vì vậy mặc định là: PREFILL xuất danh sách đề xuất (CSV đúng cột của sheet Partners), kế toán dán lên Google Sheet rồi Sync. Phương án đổi Sync thành "merge" nằm ở §7 và §9.
@@ -1036,7 +1036,7 @@ ctx = {
 
 - Thêm cột `PartnerTaxID` vào `RawPaypal`, `RawStripe`, `RawPipo` (`src/lib/db/schema.ts`), `*_COLUMNS` trong `src/lib/sources/columns.ts`, normalizer; `npm run db:generate`.
 - Thêm cột mã store vào `RawOrders` / `ORDER_COLUMNS` (§6.4).
-- Thêm cột mới làm `RowHash` của **mọi dòng cũ** đổi: file đã Build phải Unbuild rồi import lại.
+- Thêm cột mới làm `RowHash` của **mọi dòng cũ** đổi: file đã Build phải Unbuild (đã ghi sổ thì Unpost + Unbuild) rồi import lại.
 
 **Sửa engine liên quan (bug đã ghi ở guide §13.3):**
 

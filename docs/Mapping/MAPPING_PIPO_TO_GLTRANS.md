@@ -109,7 +109,10 @@ SourceKey = {TransactionId}      VD: TR01202512091023373387775
 ```
 
 Duy nhất tuyệt đối. Không chứa cột người dùng điền tay → sửa tay `JournalType`/`PartnerCode` rồi import
-lại sẽ bị chặn (*"Unbuild PIPO trước khi import lại"*).
+lại sẽ bị chặn: dòng còn event đã ghi sổ báo *"Dòng đã ghi sổ (event …, POSTED) … → Unpost + Unbuild PIPO ComCode X kỳ P
+trước khi import lại"*, còn event chưa post báo *"… → Unbuild PIPO ComCode X kỳ P trước khi import lại"*. Unbuild không kèm
+Unpost giữ dòng ở `BUILT` khi event POSTED của nó còn (guide §6.11.6); dòng vẫn lọt tới Build (vd đổi danh mục JournalType) thì
+event đã ghi sổ của dòng chặn bản mới bằng `POSTED_KEY_CHANGED`.
 
 ### Ba đặc thù định dạng phải biết
 

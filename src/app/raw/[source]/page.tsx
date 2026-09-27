@@ -75,6 +75,8 @@ function RawSource({ source }: { source: SourceKey }) {
             { label: "Thay thế", children: r.ReplacedRows },
             { label: "Bỏ qua (không đổi)", children: r.SkippedRows },
             { label: "Lỗi", children: r.ErrorRows },
+            // Dòng thuộc kỳ khóa sổ (giá trị cũ hoặc mới) → bị từ chối, đã tính trong "Lỗi"; lý do từng dòng ở bảng lỗi
+            ...(r.LockedRows > 0 ? [{ label: "Từ chối do kỳ khóa", children: r.LockedRows }] : []),
           ]}
         />
         {r.errors.length > 0 && (

@@ -56,6 +56,8 @@ export default function RawOrdersPage() {
             { label: "Bỏ qua (không đổi)", children: r.SkippedRows },
             { label: "Lỗi", children: r.ErrorRows },
             { label: "Sheet", children: r.sheetName ?? "(CSV)" },
+            // Dòng thuộc kỳ khóa sổ (giá trị cũ hoặc mới) → bị từ chối, đã tính trong "Lỗi"; lý do từng dòng ở bảng lỗi
+            ...(r.LockedRows > 0 ? [{ label: "Từ chối do kỳ khóa", children: r.LockedRows, span: 2 }] : []),
           ]}
         />
         {r.errors.length > 0 && (

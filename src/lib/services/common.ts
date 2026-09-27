@@ -1,7 +1,8 @@
-import { and, eq, gte, inArray, lte, type SQL, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, or, type SQL, type SQLWrapper, sql } from "drizzle-orm";
 import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import type { AppDb } from "@/lib/db/client";
 import {
+  accountingPeriod,
   coa,
   company,
   exceptionLog,
@@ -14,6 +15,7 @@ import {
 } from "@/lib/db/schema";
 import { MasterIndex } from "@/lib/engine/masters";
 import { nowIso } from "@/lib/engine/parse";
+import { PeriodLocks } from "@/lib/engine/period-lock";
 import type { ExceptionDraft } from "@/lib/engine/types";
 
 /** Phạm vi chạy Build/Post/Unpost/Unbuild */
@@ -46,7 +48,8 @@ export function chunk<T>(rows: T[], size = 400): T[][] {
 type Tx = Parameters<Parameters<AppDb["transaction"]>[0]>[0];
 export type DbOrTx = AppDb | Tx;
 
-export function insertExceptions(db: DbOrTx, batchType: "IMPORT" | "BUILD" | "POST", batchId: number, drafts: ExceptionDraft[]) {
+/** `batchId` null: exception không gắn lần chạy (VD tóm tắt kỳ khóa của lần Post không tạo PostingBatch) */
+export function insertExceptions(db: DbOrTx, batchType: "IMPORT" | "BUILD" | "POST", batchId: number | null, drafts: ExceptionDraft[]) {
   const createdAt = nowIso();
   for (const c of chunk(drafts, 300)) {
     db.insert(exceptionLog)
@@ -58,21 +61,86 @@ export function insertExceptions(db: DbOrTx, batchType: "IMPORT" | "BUILD" | "PO
 /**
  * Xóa exception của 1 nguồn theo phạm vi. Dùng cho các nguồn ngân hàng/PSP: exception của chúng được gom
  * nhóm (Period = null) nên không xóa được bằng khóa/kỳ như Orders.
+ * Exception thuộc kỳ khóa (`locks`) được giữ nguyên.
  */
-export function deleteExceptionsByDataSource(db: DbOrTx, batchType: "BUILD" | "POST", dataSource: string, scope: Scope) {
+export function deleteExceptionsByDataSource(db: DbOrTx, batchType: "BUILD" | "POST", dataSource: string, scope: Scope, locks = PeriodLocks.NONE) {
   const where: SQL[] = [eq(exceptionLog.BatchType, batchType), eq(exceptionLog.DataSource, dataSource)];
   if (scope.comCode) where.push(eq(exceptionLog.ComCode, scope.comCode));
+  where.push(...notLocked(locks, exceptionLog.ComCode, exceptionLog.Period));
   db.delete(exceptionLog)
     .where(and(...where))
     .run();
 }
 
-export function deleteExceptionsByKeys(db: DbOrTx, batchType: "BUILD" | "POST", keys: string[]) {
+/** Xóa exception theo SourceKey; exception thuộc kỳ khóa (`locks`) được giữ nguyên */
+export function deleteExceptionsByKeys(db: DbOrTx, batchType: "BUILD" | "POST", keys: string[], locks = PeriodLocks.NONE) {
+  const keep = notLocked(locks, exceptionLog.ComCode, exceptionLog.Period);
   for (const c of chunk([...new Set(keys)], 500)) {
     db.delete(exceptionLog)
-      .where(and(eq(exceptionLog.BatchType, batchType), inArray(exceptionLog.SourceKey, c)))
+      .where(and(eq(exceptionLog.BatchType, batchType), inArray(exceptionLog.SourceKey, c), ...keep))
       .run();
   }
+}
+
+// ───────────────────────────── Kỳ khóa sổ (guide §6.12) ─────────────────────────────
+
+/** Các kỳ đang LOCKED — đọc 1 lần đầu mỗi thao tác (trong transaction nếu thao tác ghi) */
+export function loadPeriodLocks(db: DbOrTx): PeriodLocks {
+  return new PeriodLocks(
+    db
+      .select({ ComCode: accountingPeriod.ComCode, Period: accountingPeriod.Period })
+      .from(accountingPeriod)
+      .where(eq(accountingPeriod.Status, "LOCKED"))
+      .all(),
+  );
+}
+
+/** Biểu thức SQL cùng quy tắc với `lockKey` của engine: UPPER(TRIM(ComCode)) || '|' || TRIM(Period); NULL → '' (không bao giờ khóa) */
+const lockKeySql = (comCode: SQLWrapper, period: SQLWrapper) =>
+  sql`(upper(trim(coalesce(${comCode}, ''))) || '|' || trim(coalesce(${period}, '')))`;
+
+const lockKeyList = (locks: PeriodLocks) =>
+  sql.join(
+    locks.keys.map((k) => sql`${k}`),
+    sql`, `,
+  );
+
+/**
+ * Điều kiện "không thuộc kỳ khóa" cho 1 bảng có cột ComCode + kỳ (cột Period, hoặc `periodOfDateColumn(...)`).
+ * Không kỳ nào khóa → [] (SQL giữ y hệt như trước khi có khóa sổ).
+ */
+export function notLocked(locks: PeriodLocks, comCode: SQLWrapper, period: SQLWrapper): SQL[] {
+  if (locks.isEmpty) return [];
+  return [sql`${lockKeySql(comCode, period)} NOT IN (${lockKeyList(locks)})`];
+}
+
+/** Điều kiện "thuộc kỳ khóa" (để đếm phần bị bỏ qua). Không kỳ nào khóa → luôn sai */
+export function lockedWhere(locks: PeriodLocks, comCode: SQLWrapper, period: SQLWrapper): SQL {
+  if (locks.isEmpty) return sql`0 = 1`;
+  return sql`${lockKeySql(comCode, period)} IN (${lockKeyList(locks)})`;
+}
+
+/**
+ * Thay các exception INFO PERIOD_LOCKED (tóm tắt phần bị bỏ qua vì kỳ khóa) của 1 bước: xóa bản cũ trong phạm vi
+ * (+ bản cũ trùng SourceKey với bản mới) rồi ghi `drafts`. Gọi cả khi `drafts` rỗng để dọn tóm tắt cũ sau khi mở khóa.
+ * `dataSources` null = mọi nguồn.
+ */
+export function replaceLockSummaries(
+  db: DbOrTx,
+  batchType: "BUILD" | "POST",
+  dataSources: string[] | null,
+  scope: Scope,
+  drafts: ExceptionDraft[],
+  batchId: number | null,
+) {
+  const where: SQL[] = [eq(exceptionLog.BatchType, batchType), eq(exceptionLog.ExceptionType, "PERIOD_LOCKED"), eq(exceptionLog.Severity, "INFO")];
+  if (dataSources) where.push(inArray(exceptionLog.DataSource, dataSources));
+  const inScope = and(...scopeWhere(exceptionLog, { comCode: scope.comCode, periodFrom: scope.periodFrom, periodTo: scope.periodTo })) ?? sql`1 = 1`;
+  const keys = drafts.map((d) => d.SourceKey).filter((k): k is string => !!k);
+  db.delete(exceptionLog)
+    .where(and(...where, keys.length ? or(inScope, inArray(exceptionLog.SourceKey, keys)) : inScope))
+    .run();
+  insertExceptions(db, batchType, batchId, drafts);
 }
 
 /** Điều kiện scope cho bảng có cột ComCode + Period (AccountingEvent, GLTrans) */

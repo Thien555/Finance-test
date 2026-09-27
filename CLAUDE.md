@@ -10,17 +10,17 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 
 - `npm run dev` – dev server (lần đầu tự migrate + seed `data/finance.db`)
 - `npm test` · `npx tsc --noEmit` · `npm run lint` · `npm run build`
-- `npm run db:generate` (sau khi sửa schema) · `npm run db:seed` · `npm run db:clear` (xóa dữ liệu giao dịch, giữ master) · `npm run db:reset` (xóa hẳn file DB, tắt dev server trước)
+- `npm run db:generate` (sau khi sửa schema) · `npm run db:seed` · `npm run db:clear` (xóa dữ liệu giao dịch, giữ master + kỳ kế toán; từ chối khi còn kỳ khóa) · `npm run db:reset` (xóa hẳn file DB, tắt dev server trước)
 - `npm run audit -- orders|paypal|stripe|pipo` – đo lại baseline trên DB riêng (in số liệu để ghi vào rule 9 + guide §10.2)
 - `npm run db:export-seed` – ghi Company/GatewayCompanyMapping (sửa trên web, không có trong sheet) từ DB ra `data/seed` để commit
 
 ## Bản đồ code
 
-- `src/lib/engine/` – logic nghiệp vụ thuần, không DB (`build-orders.ts`, `build-bank.ts` + `sources/*.ts` cho 3 nguồn ngoài Orders, `reconcile-events.ts`, `post.ts`, `post-guard.ts`, `resolve-partner.ts`, `resolve-fx.ts`, `keys.ts`, `parse.ts`, `masters.ts`)
-- `src/lib/services/` – đọc/ghi DB, transaction, batch log (`import-orders`, `import-source`, `build`, `build-source`, `post`, `clear`, `queries`, `export`, `master`)
+- `src/lib/engine/` – logic nghiệp vụ thuần, không DB (`build-orders.ts`, `build-bank.ts` + `sources/*.ts` cho 3 nguồn ngoài Orders, `reconcile-events.ts`, `post.ts`, `post-guard.ts`, `period-lock.ts` (khóa sổ), `resolve-partner.ts`, `resolve-fx.ts`, `keys.ts`, `parse.ts`, `masters.ts`)
+- `src/lib/services/` – đọc/ghi DB, transaction, batch log (`import-orders`, `import-source`, `build`, `build-source`, `post`, `clear`, `periods` (kỳ kế toán), `queries`, `export`, `master`; helper kỳ khóa `loadPeriodLocks`/`notLocked` ở `common`)
 - `src/app/api/**/route.ts` – route mỏng, bọc `handle()` từ `src/lib/api.ts`
 - `src/app/**/page.tsx` – màn hình client antd; helper ở `src/components/client.ts`, `src/components/ui.tsx`
-- `src/lib/db/schema.ts` – 18 bảng, tên cột giữ đúng như sheet (kể cả khoảng trắng và typo `BankAccoutNumber`) · `drizzle/` – migration
+- `src/lib/db/schema.ts` – 20 bảng, tên cột giữ đúng như sheet (kể cả khoảng trắng và typo `BankAccoutNumber`) · `drizzle/` – migration
 - `tests/` – vitest (engine + integration trên DB tạm) · `data/seed/` – master CSV · `data/samples/` – **4 file dữ liệu thật** (`order-data.csv`, `Bank_Paypal.csv`, `Bank_Stripe.csv`, `Bank_Pipo.csv`) + 3 CSV tham chiếu
 - `docs/` – `DEVELOPER_GUIDE.md` (kỹ thuật), `BA_PREFILL_SOURCES.md` (đặc tả PREFILL cho dev) · `docs/Docs-BA/` – tài liệu BA (yêu cầu gốc, BA tổng thể, PREFILL) · `docs/Mapping/` – một dòng nguồn ra Nợ/Có nào, 4 nguồn
 
@@ -48,6 +48,7 @@ Web kế toán cho công ty dropshipping: **file thô → bảng Raw → (Build)
 | Công thức sinh event, map seller/ComCode | §6.2 |
 | Nợ/Có, Single/Bulk, DocNum, tỷ giá | §6.3 |
 | Unpost/Unbuild | §6.4 |
+| Khóa kỳ kế toán (AccountingPeriod, chốt chặn Import/Build/Post/Unpost/Unbuild) | §6.12 |
 | API | §7 |
 | UI/antd | §8 |
 | Build PayPal/Stripe/PIPO | §6.11 |

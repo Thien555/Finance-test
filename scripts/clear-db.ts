@@ -6,9 +6,12 @@
  * GatewayCompanyMapping đã sửa trên web mà chưa chạy `db:export-seed`.
  *
  * Chạy thêm VACUUM + checkpoint WAL để file DB co lại — xóa dòng thôi thì SQLite giữ nguyên dung lượng.
+ *
+ * Còn kỳ khóa sổ (AccountingPeriod LOCKED) → từ chối, không xóa gì, thoát mã 1 (guide §6.12).
  */
 import fs from "node:fs";
 import { closeDb, DB_FILE, getDb } from "@/lib/db/client";
+import { BadRequestError } from "@/lib/errors";
 import { resetTransactionalData } from "@/lib/services/clear";
 
 const sizeMb = () => {
@@ -19,7 +22,14 @@ const sizeMb = () => {
 
 const before = sizeMb();
 const sqlite = getDb().$client; // mở DB: tự migrate + seed master nếu rỗng
-resetTransactionalData();
+try {
+  resetTransactionalData();
+} catch (err) {
+  if (!(err instanceof BadRequestError)) throw err;
+  closeDb();
+  console.error(`Không xóa: ${err.message}`);
+  process.exit(1);
+}
 sqlite.pragma("wal_checkpoint(TRUNCATE)");
 sqlite.exec("VACUUM");
 closeDb();

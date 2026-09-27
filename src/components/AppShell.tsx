@@ -6,6 +6,7 @@ import {
   CloudUploadOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  LockOutlined,
   NodeIndexOutlined,
   SendOutlined,
 } from "@ant-design/icons";
@@ -28,6 +29,7 @@ const MENU = [
   { key: "/posting", icon: <SendOutlined />, label: "3. Posting (PostingBatch)" },
   { key: "/gl", icon: <BookOutlined />, label: "4. GLTrans (Sổ cái)" },
   { key: "/exceptions", icon: <AlertOutlined />, label: "Exceptions" },
+  { key: "/periods", icon: <LockOutlined />, label: "Kỳ kế toán" },
   { key: "/master", icon: <DatabaseOutlined />, label: "Master data" },
 ];
 

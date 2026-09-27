@@ -102,8 +102,13 @@ export default function DashboardPage() {
               run(
                 "cycle",
                 () => postJson("/api/cycle"),
-                (r: { build: { EventsCreated: number; EventsReplaced: number }; post: { InsertedRows: number }[] }) =>
-                  `Build: +${r.build.EventsCreated} event (thay ${r.build.EventsReplaced}) · Post: ${r.post.reduce((a, p) => a + p.InsertedRows, 0)} dòng GL`,
+                (r: { build: { EventsCreated: number; EventsReplaced: number; LockedSkipped: number }; post: { InsertedRows: number; LockedEvents: number }[] }) => {
+                  // Phần thuộc kỳ khóa sổ: Build không ghi draft, Post không ghi event NEW → báo riêng từng bước (tránh cộng trùng)
+                  const lockedPost = r.post.reduce((a, p) => a + p.LockedEvents, 0);
+                  const lockedBuild = r.build.LockedSkipped > 0 ? `, bỏ qua ${r.build.LockedSkipped} event kỳ khóa` : "";
+                  const lockedPosted = lockedPost > 0 ? ` · bỏ qua ${lockedPost} event kỳ khóa` : "";
+                  return `Build: +${r.build.EventsCreated} event (thay ${r.build.EventsReplaced}${lockedBuild}) · Post: ${r.post.reduce((a, p) => a + p.InsertedRows, 0)} dòng GL${lockedPosted}`;
+                },
               )
             }
           >
@@ -111,7 +116,13 @@ export default function DashboardPage() {
           </Button>
           <Popconfirm
             title="Xóa toàn bộ dữ liệu test?"
-            description="Xóa raw order, event, GL, batch, exception. Giữ nguyên master data."
+            description={
+              <span>
+                Xóa raw order, event, GL, batch, exception. Giữ nguyên master data và trạng thái kỳ kế toán.
+                <br />
+                Bị từ chối khi còn kỳ đang khóa sổ (mở khóa ở trang <Link href="/periods">Kỳ kế toán</Link>).
+              </span>
+            }
             onConfirm={() => run("reset", () => postJson("/api/reset"), () => "Đã xóa dữ liệu test")}
           >
             <Button danger icon={<DeleteOutlined />} loading={busy === "reset"}>

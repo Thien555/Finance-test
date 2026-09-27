@@ -3,8 +3,9 @@
 | Mục | Nội dung |
 |---|---|
 | Dự án | Sky Finance – Accounting Engine: web kế toán cho công ty dropshipping |
-| Phiên bản | 1.0 |
-| Ngày | 2026-09-25 |
+| Phiên bản | 1.1 |
+| Ngày | 2026-09-27 |
+| Thay đổi | 1.1 (2026-09-27): thêm khóa kỳ kế toán – viết lại mục 4.3, cập nhật các mục 1–3, 5, 7, 9, 10.5, 14–18, 20–23 và Phụ lục C. 1.0 (2026-09-25): bản đầu |
 | Căn cứ | Tài liệu yêu cầu gốc [Accounting Engine – Raw Source đến GLTrans](1.Accounting_Engine_Functional_Handover.md), Draft 1.0, ngày 2026-05-23 |
 | Phạm vi | Toàn bộ luồng từ file thô đến sổ cái của 4 nguồn Orders, PayPal, Stripe, PingPong; danh mục; vận hành |
 | Người đọc | Kế toán, quản lý dự án, đội phát triển |
@@ -62,13 +63,13 @@ Tài liệu này mô tả toàn bộ yêu cầu nghiệp vụ và cách hệ th�
 | Review | Tra cứu, kiểm tra AccountingEvent | Đã làm (một phần) |
 | Post | Ghi sổ Single và Bulk | Làm khác (thử lại event lỗi) |
 | Tỷ giá | Quy đổi tiền tệ | Làm khác |
-| Điều chỉnh vận hành | Unpost, Unbuild, Unpost + Unbuild | Đã làm (chưa khóa kỳ, chưa audit) |
+| Điều chỉnh vận hành | Unpost, Unbuild, Unpost + Unbuild | Làm khác (bỏ qua phần kỳ đã khóa thay vì không cho chạy; chưa audit) |
 | Điều chỉnh vận hành | Run Accounting Cycle | Làm khác |
 | Danh mục | JournalType, JournalLineRule, Partners, CoA, tỷ giá, Bank Mapping | Làm khác (sửa trên Google Sheet, web chỉ xem) |
 | Danh mục | Company, GatewayCompanyMapping | Làm khác (Company rút gọn) |
-| Danh mục | Accounting Period (khóa kỳ) | Chưa làm |
+| Danh mục | Accounting Period (khóa kỳ) | Làm khác (khóa theo công ty × tháng ở trang Kỳ kế toán; lệnh phạm vi rộng bỏ qua kỳ khóa thay vì từ chối cả lệnh; chưa phân quyền, chưa đóng vĩnh viễn) |
 | Log, exception | Nhật ký import/build/post, danh sách lỗi | Làm khác (Missing FX / Missing Mapping / Skipped gộp vào một màn Exceptions; nhật ký Import chưa lưu người upload, công ty, kỳ) |
-| Log | Audit log thao tác người dùng | Chưa làm |
+| Log | Audit log thao tác người dùng | Chưa làm (riêng khóa / mở khóa kỳ đã có lịch sử) |
 | Dashboard | Theo dõi vận hành | Làm khác |
 | Output | Export Excel | Làm khác (chỉ GL và event) |
 | Phân quyền | Đăng nhập, vai trò | Chưa làm |
@@ -98,6 +99,8 @@ Tài liệu này mô tả toàn bộ yêu cầu nghiệp vụ và cách hệ th�
 | InputCurr | Đồng tiền của giao dịch |
 | Sync | Nút trên trang Master: nạp lại 6 bảng danh mục từ Google Sheet |
 | Exception | Cảnh báo hoặc lỗi được ghi lại khi Build/Post, xem ở trang Exceptions |
+| Kỳ (Period) | Một tháng dương lịch, ghi dạng YYYYMM, vd `202511` |
+| Kỳ khóa sổ (kỳ `LOCKED`) | Một công ty × một kỳ đã được khóa ở trang Kỳ kế toán: không nhận thêm, không sửa, không ghi sổ, không gỡ sổ dữ liệu của kỳ cho tới khi mở khóa (mục 4.3) |
 
 ---
 
@@ -129,6 +132,7 @@ flowchart LR
 
 - Không bao giờ ghi thẳng từ file vào sổ cái.
 - Mỗi bước có nhật ký riêng (ImportBatch, BuildBatch, PostingBatch) và làm lại được bằng Unpost / Unbuild. Mọi dòng sổ cái truy ngược được về dòng dữ liệu gốc.
+- Ngoại lệ: dữ liệu thuộc **kỳ đã khóa sổ** không bị thêm, sửa, ghi sổ hay gỡ sổ bởi bất kỳ bước nào cho tới khi mở khóa (mục 4.3).
 
 ### 2.2 Build tách khỏi Post
 
@@ -185,7 +189,7 @@ flowchart LR
 | GL & Posting | GL Inquiry | GL (`/gl`) | Tra cứu, tổng hợp theo tài khoản, xem chứng từ (dòng sổ cái → event → dòng Raw), Export Excel | Đã làm (xem dòng Raw gốc mới có cho Orders) |
 | GL & Posting | Clear/Rebuild Console | Gộp vào Events và Posting | Unpost, Unbuild, Unpost + Unbuild | Làm khác |
 | Danh mục | Company | Master, tab Company | Thêm, sửa | Làm khác (không có cây công ty) |
-| Danh mục | Accounting Period | – | – | Chưa làm |
+| Danh mục | Accounting Period | Kỳ kế toán (`/periods`), menu ngay trên Master data | Ma trận kỳ × công ty kèm việc dở; Khóa, Khóa đến hết kỳ, Mở khóa (tên + lý do), Lịch sử khóa / mở khóa | Làm khác (mục 4.3) |
 | Danh mục | CoA, Partners, JournalType, JournalLineRule, Exchange Rate, Bank Mapping | Master, các tab tương ứng | Chỉ xem; sửa trên Google Sheet rồi Sync | Làm khác |
 | Danh mục | Partner/Seller Mapping | – | Điền trước (PREFILL) sẽ thay thế một phần | Chưa làm |
 | Danh mục | (không có trong gốc) | Master, tab GatewayCompanyMapping | Thêm, sửa, xóa | Đã làm |
@@ -226,18 +230,292 @@ Bảng Company hiện có 4 cột: `ComCode`, `CompanyName`, `FunctionalCurrency
 
 ### 4.3 Accounting Period
 
-Hiện chưa có khóa kỳ: kỳ đã ghi sổ vẫn Unpost và ghi lại được.
+Khóa sổ theo **công ty × tháng**. Kỳ đã khóa thì dữ liệu của kỳ đứng yên cho tới khi có người mở khóa kèm lý do. Quản lý ở trang **Kỳ kế toán** (`/periods`). Chi tiết kỹ thuật: [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục 6.12.
 
-**Yêu cầu gốc:**
-
-| Trường | Mô tả |
+| Nội dung | Quy tắc |
 |---|---|
-| `ComCode` | Kỳ quản lý theo công ty |
-| `Period` | YYYYMM |
-| `Status` | `OPEN` hoặc `LOCKED` |
-| `LockedBy`, `LockedAt`, `UnlockReason` | Thông tin khóa / mở khóa |
+| Đơn vị khóa | 1 công ty (`ComCode`) × 1 kỳ (`Period` YYYYMM) |
+| Trạng thái | `OPEN` (mặc định, kể cả khi chưa có dòng nào) hoặc `LOCKED` |
+| Khóa | Gõ tên người khóa. Còn việc dở chỉ cảnh báo. Khóa kỳ nào trước cũng được; có thao tác "Khóa đến hết kỳ" |
+| Mở khóa | Gõ tên + lý do tối thiểu 10 ký tự; từng kỳ một |
+| Dữ liệu thuộc kỳ khóa | Import: **từ chối từng dòng**. Build, Post, Unpost, Unbuild, Unpost + Unbuild, full cycle: **bỏ qua phần kỳ khóa, báo số lượng**, phần kỳ mở vẫn chạy. "Xóa dữ liệu test": **từ chối cả lệnh** |
+| Lịch sử | Mỗi lần khóa / mở khóa ghi 1 dòng, kèm việc dở của kỳ lúc thao tác |
 
-Kỳ `LOCKED` phải chặn mọi thao tác làm thay đổi dữ liệu của kỳ: upload/import, thay raw, sửa raw, build, post, unpost, unbuild, unpost + unbuild.
+#### 4.3.1 Mục đích và căn cứ
+
+Trước khi có khóa kỳ, kỳ đã ghi sổ và đã báo cáo vẫn Import, Build, Post, Unpost lại được, nên số liệu đã chốt có thể bị đổi mà không ai biết. Khóa kỳ để:
+
+- Số liệu của kỳ đã chốt (báo cáo tháng, báo cáo tài chính, quyết toán thuế) không đổi cho tới khi có người mở khóa, và mọi lần mở khóa đều có tên và lý do.
+- Kế toán vẫn chạy lệnh cho cả năm, cả công ty mà không sợ đụng vào kỳ đã chốt.
+
+Căn cứ (chi tiết ở 4.3.11):
+
+- Luật Kế toán 88/2015/QH13 Điều 12: kỳ kế toán tháng tính từ ngày đầu đến hết ngày cuối tháng.
+- Điều 26: phải khóa sổ kế toán cuối kỳ trước khi lập báo cáo tài chính.
+- Điều 27: sai sót trên sổ được sửa bằng cải chính, ghi số âm hoặc chứng từ điều chỉnh (sổ trên phương tiện điện tử dùng chứng từ điều chỉnh), không sửa đè; sai sót phát hiện sau khi đã nộp báo cáo tài chính thì sửa trên sổ của năm phát hiện.
+
+#### 4.3.2 Dữ liệu
+
+**Bảng `AccountingPeriod`** – trạng thái hiện tại của từng công ty × kỳ. Khóa nhận diện: `ComCode` + `Period`.
+
+| Trường | Ý nghĩa |
+|---|---|
+| `ComCode` | Công ty, lưu viết hoa. Phải có trong bảng Company mới khóa được |
+| `Period` | Kỳ YYYYMM, tháng 01–12 |
+| `Status` | `OPEN` hoặc `LOCKED`. **Không có dòng = `OPEN`** |
+| `LockedBy`, `LockedAt` | Người khóa (gõ tên), thời điểm khóa – của lần khóa gần nhất |
+| `UnlockedBy`, `UnlockedAt`, `UnlockReason` | Người mở khóa, thời điểm, lý do – của lần mở khóa gần nhất (vẫn giữ khi kỳ đã khóa lại) |
+| `Note` | Ghi chú khi khóa – của lần khóa gần nhất |
+| `ModifiedDate` | Thời điểm đổi trạng thái gần nhất |
+
+**Bảng `AccountingPeriodLog`** – lịch sử khóa / mở khóa, chỉ thêm, không sửa hay xóa (mục 4.3.9).
+
+| Trường | Ý nghĩa |
+|---|---|
+| `ID` | Số thứ tự, tăng dần |
+| `ComCode`, `Period` | Công ty, kỳ |
+| `Action` | `LOCK` (khóa) hoặc `UNLOCK` (mở khóa) |
+| `FromStatus`, `ToStatus` | Trạng thái trước và sau |
+| `ActorName` | Người thao tác (gõ tên) |
+| `Reason` | Ghi chú khi khóa, hoặc lý do khi mở khóa |
+| `ChecksSnapshot` | Việc dở của kỳ lúc thao tác (JSON): số dòng Raw theo nguồn, Raw chưa build / lỗi, event theo trạng thái, số dòng sổ cái, số chứng từ, Σ Nợ / Σ Có, cân hay lệch, danh sách cảnh báo (mục 4.3.8) |
+| `CreatedAt` | Thời điểm thao tác |
+
+Thời điểm ghi theo giờ máy chủ, dạng `YYYY-MM-DD HH:mm:ss`.
+
+Hai bảng này là **dữ liệu vận hành**, không phải danh mục:
+
+- Không có trên Google Sheet, không có trong file dữ liệu mẫu (seed); Sync không đụng tới.
+- "Xóa dữ liệu test" không xóa 2 bảng này, và **bị từ chối** khi còn kỳ đang khóa.
+- Chỉ lệnh xóa hẳn file dữ liệu trên máy phát triển (`npm run db:reset`) làm mất trạng thái kỳ và lịch sử.
+
+#### 4.3.3 Trạng thái và chuyển trạng thái
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> OPEN: chưa có dòng
+  OPEN --> LOCKED: Khóa (gõ tên)
+  LOCKED --> OPEN: Mở khóa (tên + lý do ≥ 10 ký tự)
+```
+
+| Thao tác | Chuyển | Bắt buộc | Ghi chú |
+|---|---|---|---|
+| Khóa | `OPEN` → `LOCKED` | Tên người khóa (tối đa 100 ký tự). Ghi chú không bắt buộc (tối đa 500 ký tự). Còn việc dở: phải đánh dấu "đã xem cảnh báo" | Chọn nhiều ô một lần, tối đa 500 kỳ. Ô đã khóa sẵn được bỏ qua, không ghi lịch sử |
+| Khóa đến hết kỳ P | `OPEN` → `LOCKED` | Như trên, thêm chọn công ty (1 hoặc nhiều) và kỳ P | Khóa mọi kỳ ≤ P **có dữ liệu** của từng công ty, và chính kỳ P (kể cả khi chưa có dữ liệu). Kỳ có dữ liệu = có dòng Raw đã xác định công ty, event hoặc dòng sổ cái |
+| Mở khóa | `LOCKED` → `OPEN` | Tên + lý do từ 10 đến 500 ký tự | Từng kỳ một. Kỳ sau của cùng công ty còn khóa thì chỉ cảnh báo. Xóa các dòng tóm tắt INFO `PERIOD_LOCKED` của kỳ (mục 4.3.5) |
+
+- **Thứ tự tự do:** khóa kỳ nào trước cũng được, không cần kỳ trước đã khóa. Mở khóa một kỳ khi kỳ sau còn khóa: hệ thống cảnh báo "Các kỳ sau của … vẫn đang khóa: …" nhưng vẫn cho mở.
+- **Khóa trước kỳ chưa có dữ liệu** được phép, để chặn nhập nhầm vào kỳ đó.
+- Khóa và "Khóa đến hết kỳ" luôn **xem trước việc dở** rồi mới xác nhận. Lệnh khóa thật dùng đúng danh sách kỳ đã xem trước, nên dữ liệu phát sinh giữa hai bước không làm khóa thêm kỳ khác.
+- Khóa / mở khóa lặp lại bao nhiêu lần cũng được; mỗi lần ghi 1 dòng lịch sử.
+- ComCode chỉ có trong dữ liệu mà không có trong bảng Company thì không khóa được: trang Kỳ kế toán hiện cảnh báo ở tiêu đề cột đó, không cho chọn ô, và nhắc thêm công ty ở trang Master.
+
+#### 4.3.4 Kỳ khóa chặn gì
+
+| Thao tác | Với dữ liệu thuộc kỳ khóa | Báo ở đâu |
+|---|---|---|
+| Import, Import lại (4 nguồn) | **Từ chối từng dòng:** dòng mới thuộc kỳ khóa; dòng đã có mà nội dung đổi, khi giá trị mới **hoặc** giá trị cũ thuộc kỳ khóa (không cho dời dòng vào hay ra khỏi kỳ khóa); dòng còn nằm trong event thuộc kỳ khóa. Dòng khác trong file vẫn được nhận. Dòng giống hệt dòng đã có vẫn bỏ qua như cũ, không báo lỗi | Hộp kết quả Import: "Từ chối do kỳ khóa" (đã tính trong số dòng lỗi) và lý do từng dòng; nhật ký Import `PARTIAL` hoặc `FAILED` như lỗi dòng thường |
+| Build (4 nguồn) | **Bỏ qua:** không tạo, thay, xóa event của kỳ khóa; không đổi trạng thái dòng Raw của kỳ; giữ exception cũ của kỳ. Phần kỳ mở chạy bình thường | Hộp kết quả Build: "Bỏ qua do kỳ khóa (giữ nguyên)", "Chặn do đụng kỳ khóa (ERROR PERIOD_LOCKED)", cảnh báo liệt kê kỳ; exception INFO `PERIOD_LOCKED` |
+| Post (Single, Bulk, tất cả) | **Bỏ qua** event chờ Post (`NEW`, `ERROR` bước Post) của kỳ khóa. Mọi event chờ Post đều thuộc kỳ khóa thì kết quả là `NOTHING_TO_POST`, không tạo lần Post | Cột "Kỳ khóa (bỏ qua)" của kết quả Post, cảnh báo liệt kê kỳ; exception INFO `PERIOD_LOCKED` bước Post |
+| Unpost (theo phạm vi hoặc theo lần Post) | **Giữ nguyên** chứng từ của kỳ khóa: dòng sổ cái và event `POSTED`. Lần Post còn dòng sổ cái của kỳ khóa giữ trạng thái `SUCCESS` | Hộp xác nhận: "Giữ nguyên n chứng từ (m event)". Cả phạm vi thuộc kỳ khóa: báo và không chạy |
+| Unbuild | **Giữ nguyên** event của kỳ khóa (mọi trạng thái), dòng Raw của kỳ và exception của kỳ. Dòng Raw còn nằm trong event kỳ khóa cũng giữ `BUILT` (Orders: theo dòng hàng; PayPal, Stripe, PingPong: event sinh từ dòng); riêng Unbuild xét dòng Raw Orders theo ComCode **đang lưu** trên dòng (không xét mapping hiện tại) — vd cổng đã đổi sang công ty đang khóa kỳ thì Unbuild công ty cũ vẫn đưa dòng về chưa build, dữ liệu kỳ khóa không đổi | Hộp xác nhận: "Giữ nguyên n event, m dòng raw". Cả phạm vi thuộc kỳ khóa: báo và không chạy |
+| Unpost + Unbuild | Như Unpost và Unbuild | Hộp xác nhận: "Giữ nguyên n event, m dòng raw, k chứng từ" |
+| Chạy full cycle (Dashboard) | Build Orders rồi Post, mỗi bước như trên | Thông báo kết quả thêm "bỏ qua X event kỳ khóa" cho Build và cho Post |
+| Xóa dữ liệu test (Dashboard), `npm run db:clear` | **Từ chối cả lệnh** khi còn ít nhất 1 kỳ khóa (của bất kỳ công ty nào), không xóa gì | "Còn n kỳ đang khóa sổ (…) → mở khóa ở trang Kỳ kế toán trước khi xóa dữ liệu test" (liệt kê tối đa 5 kỳ). `db:clear` in "Không xóa: …" và dừng với mã lỗi 1 |
+| Sync danh mục; sửa Company, GatewayCompanyMapping | Không bị chặn, không đụng bảng kỳ. Danh mục mới chỉ có tác dụng khi Build / Post lại, mà Build / Post bỏ qua kỳ khóa, nên số của kỳ khóa không đổi. Đổi GatewayCompanyMapping chạm tới kỳ khóa: xem 4.3.5 | – |
+| Xem, lọc, Export Excel | Không ảnh hưởng | – |
+
+**Ngày nào quyết định kỳ**
+
+| Dữ liệu | Công ty | Kỳ |
+|---|---|---|
+| Raw Orders | ComCode theo GatewayCompanyMapping **hiện tại** của `PaymentGatewayName`, **và** ComCode đang lưu trên dòng (lần Import / Build trước ghi). Một trong hai thuộc kỳ khóa là dòng bị coi là thuộc kỳ khóa | YYYYMM của `FulfilledAt` (ngày giao). Dòng chưa giao không thuộc kỳ nào nên giá trị mới không bị chặn; nhưng không thay được dòng cũ đã giao trong kỳ khóa (kể cả xóa trống ngày giao) |
+| Raw PayPal, Stripe, PingPong | Cột `ComCode` trên file | YYYYMM của ngày giao dịch: PayPal `Date`; Stripe `Date`, trống thì `Created (UTC)`; PingPong phần ngày của `Time` |
+| AccountingEvent, GLTrans, ExceptionLog | Cột `ComCode` | Cột `Period` |
+
+- Import xét cả giá trị mới trên file lẫn giá trị cũ đang lưu. Vd dòng order đã giao 30/11 (kỳ 202511 đã khóa) được sửa ngày giao thành 02/12: vẫn bị từ chối.
+- **Một chứng từ luôn thuộc đúng 1 công ty × 1 kỳ** (Single: 1 event; Bulk: khóa gom có công ty và ngày), nên Unpost không bao giờ gỡ dở một chứng từ.
+- Dòng Raw chưa xác định được công ty (Orders: cổng thanh toán chưa map; ngân hàng: cột `ComCode` trống) không thuộc công ty nào nên **không khóa được**. Trang Kỳ kế toán báo riêng các dòng này theo kỳ và nguồn.
+- Exception gom nhóm của PayPal, Stripe, PingPong không có kỳ (mục 18.1) nên không được giữ theo kỳ khóa.
+
+#### 4.3.5 Lệnh phạm vi rộng
+
+Build, Post, Unpost, Unbuild, Unpost + Unbuild và full cycle chạy trên phạm vi chọn (công ty + nguồn + khoảng kỳ; để trống là tất cả). Phạm vi có chứa kỳ khóa thì lệnh **không bị từ chối**: phần kỳ mở chạy bình thường, phần kỳ khóa giữ nguyên và được báo số lượng.
+
+**Báo số lượng**
+
+- Hộp kết quả / hộp xác nhận hiện số bị bỏ qua và một cảnh báo liệt kê kỳ khóa (tối đa 6 kỳ, còn lại ghi "và n kỳ khác"), kèm đường dẫn tới trang Kỳ kế toán.
+- Build và Post ghi thêm exception **INFO `PERIOD_LOCKED`**: 1 dòng cho mỗi nguồn × công ty × kỳ, vd "ZENIROXPAY kỳ 202511 đã khóa sổ → Build bỏ qua 403 dòng nguồn, 1205 event. Muốn ghi lại: mở khóa kỳ ở trang Kỳ kế toán (ghi lý do), chạy lại rồi khóa lại".
+  - Lần chạy sau **thay** dòng cũ, không cộng dồn: số trên dòng là của lần chạy gần nhất có chạm tới kỳ đó (Build phạm vi hẹp có thể thay bằng số nhỏ hơn).
+  - Tóm tắt của bước Post không gắn với lần Post nào, và đếm event chờ Post của cả Single lẫn Bulk dù bấm nút nào.
+  - Mở khóa kỳ thì các dòng tóm tắt của kỳ bị xóa.
+- Unpost, Unbuild không ghi exception, chỉ báo trong hộp xác nhận.
+
+**Dòng ở kỳ mở đụng event của kỳ khóa**
+
+Build vẫn chống ghi sổ trùng như mục 7.1. Event của kỳ khóa không xóa, không thay được, nên được coi như **đã ghi sổ ở mọi trạng thái**:
+
+| Tình huống | Hệ thống xử lý |
+|---|---|
+| Orders: dòng hàng ở kỳ mở còn nằm trong event của kỳ khóa (vd đổi GatewayCompanyMapping sang công ty khác, đổi ngày giao sang tháng đang mở) | Event mới vẫn ghi nhưng trạng thái `ERROR`, Post không lấy; exception **ERROR `PERIOD_LOCKED`**: "Item của event này còn nằm trong event … thuộc ZENIROXPAY kỳ 202511 đã khóa sổ → chặn để không ghi sổ trùng…". Event cũ giữ nguyên |
+| PayPal, Stripe, PingPong: dòng sao kê nay thuộc kỳ mở nhưng event cùng mã giao dịch nằm ở kỳ khóa | Không ghi event mới; exception **ERROR `PERIOD_LOCKED`**: "Event … cùng khóa đang thuộc … đã khóa sổ, dòng nguồn nay thuộc kỳ … → không ghi…" |
+| Event của kỳ khóa không còn được sinh ra | Giữ nguyên, không cảnh báo |
+| Bản mới thuộc kỳ khóa, event cũ ở kỳ mở (vd đổi GatewayCompanyMapping sang công ty đang khóa kỳ đó) | Bản mới không ghi (tính vào "Bỏ qua do kỳ khóa"); event cũ xử lý như không còn sinh ra: chưa ghi sổ thì xóa, đã ghi sổ thì cảnh báo `POSTED_SOURCE_CHANGED`. Các đơn này tạm không có event cho tới khi mở khóa kỳ của công ty mới |
+
+Cách sửa khi gặp ERROR `PERIOD_LOCKED`: mở khóa kỳ bị đụng (ghi lý do) → Unpost + Unbuild kỳ đó → Build + Post lại → khóa lại.
+
+**Ví dụ (số thật của bộ dữ liệu kiểm thử: 431 dòng order tháng 11/2025, trong đó 403 dòng đã giao).** ZENIROXPAY kỳ 202511 đã khóa, kỳ 202512 còn mở. Kỳ 202511 có 403 dòng Raw Orders đã giao, sinh 1.205 event, đã ghi 50 chứng từ (100 dòng sổ cái, Σ Nợ = Σ Có = 43.227,58).
+
+1. Build Orders, không chọn phạm vi. Kỳ 202512 build như thường (tạo, thay, xóa event). Kỳ 202511: 403 dòng Raw giữ trạng thái, 1.205 event sinh lại không được ghi, event cũ giữ nguyên. Hộp kết quả: "Bỏ qua do kỳ khóa (giữ nguyên): 1205 event · 403 dòng raw", cảnh báo "Build bỏ qua 1205 event (403 dòng raw) thuộc kỳ đã khóa sổ – ZENIROXPAY 202511".
+2. Trang Exceptions có 1 dòng INFO `PERIOD_LOCKED` cho ORDERS × ZENIROXPAY × 202511. Build lần nữa: vẫn 1 dòng.
+3. Post tất cả: event `NEW` của 202512 được ghi sổ; event `NEW` còn sót của 202511 (nếu có) đứng yên, đếm ở cột "Kỳ khóa (bỏ qua)".
+4. Unpost + Unbuild cả năm: gỡ sổ và xóa phần 202512; hộp xác nhận báo "Giữ nguyên 1205 event, 403 dòng raw, 50 chứng từ".
+
+#### 4.3.6 Dữ liệu đến muộn
+
+**Ví dụ.** ZENIROXPAY đã Import, Build, Post sao kê PayPal tháng 11/2025 và khóa kỳ 202511 ngày 05/12. Ngày 10/12 nhận file sao kê bổ sung, trong đó có 1 dòng ngày 28/11/2025 chưa từng nhập.
+
+- Import file: dòng 28/11 bị từ chối với lý do "Dòng thuộc ZENIROXPAY kỳ 202511 đã khóa sổ → không nhận. Muốn ghi: mở khóa ZENIROXPAY kỳ 202511 ở trang Kỳ kế toán (ghi lý do) rồi import lại". Dòng của tháng 12 vẫn được nhận; dòng giống hệt dòng đã nhập được bỏ qua, không báo lỗi. Hộp kết quả: "Từ chối do kỳ khóa: 1"; nhật ký Import `PARTIAL`.
+- Orders tương tự: dòng có ngày giao trong kỳ khóa, hoặc sửa số tiền của dòng thuộc kỳ khóa, đều bị từ chối.
+
+**Cách xử lý hiện nay** (kế toán trưởng quyết định có sửa số của kỳ đã chốt hay không):
+
+1. Mở khóa ZENIROXPAY kỳ 202511, lý do vd "Sao kê PayPal T11 về muộn, cần import bổ sung".
+2. Import lại file sao kê.
+3. Build PayPal phạm vi ZENIROXPAY, kỳ 202511 → kiểm tra trang Exceptions.
+4. Post → kiểm tra sổ cái.
+5. Khóa lại kỳ 202511.
+
+**Chưa có:** tự chuyển dòng về muộn sang kỳ mở kế tiếp, hoặc ghi bút toán điều chỉnh vào kỳ đang mở (cách Luật Kế toán Điều 27 và VAS 29 dùng khi sai sót phát hiện sau khi đã nộp báo cáo). Đây là câu hỏi mở (mục 23.4).
+
+#### 4.3.7 Quy trình cho kế toán
+
+**Trang Kỳ kế toán (`/periods`)**
+
+- Bộ lọc: công ty (ẩn / hiện cột), khoảng "Kỳ từ – Kỳ đến". Chọn đủ 2 đầu thì mọi tháng trong khoảng đều hiện (tối đa 120 tháng gần "Kỳ đến" nhất), để khóa trước cả tháng chưa có dữ liệu. Bên cạnh có số "Đang khóa n kỳ (mọi công ty)".
+- **Ma trận:** dòng = kỳ (mới nhất ở trên), cột = công ty, tiêu đề "ComCode (FncCurr)". Checkbox ở cột Kỳ chọn cả dòng.
+- **Mỗi ô:** checkbox, trạng thái `OPEN` / `LOCKED` (có biểu tượng khóa), "GL n dòng · m CT" (số dòng sổ cái, số chứng từ) và các chip:
+
+| Chip | Nghĩa |
+|---|---|
+| NEW (xanh) | Event chưa Post |
+| ERR (đỏ) | Event lỗi |
+| Raw (cam) | Dòng Raw chưa build hoặc lỗi build |
+| Lệch (đỏ) | Σ Nợ ≠ Σ Có của sổ cái trong kỳ |
+
+- Rê chuột vào ô: số dòng Raw theo từng nguồn (tổng, chưa build, lỗi), event theo trạng thái, sổ cái, Σ Nợ / Σ Có, cân hay lệch, lần khóa và mở khóa gần nhất, việc dở.
+- Ô đang chọn tô xanh nhạt, ô `LOCKED` tô hồng nhạt. Ô chưa có dữ liệu hiện "—" nhưng vẫn chọn được.
+- Có dòng Raw chưa xác định công ty thì trang hiện cảnh báo riêng theo kỳ và nguồn.
+- Nút: **Khóa (n)** (n = số ô `OPEN` đang chọn), **Khóa đến hết kỳ…**, **Mở khóa** (chỉ bật khi chọn đúng 1 ô `LOCKED`), **Lịch sử**.
+
+**Khóa sổ cuối tháng**
+
+1. Import đủ file của tháng: file order và 3 file sao kê.
+2. Build từng nguồn theo công ty + kỳ; xem trang Exceptions, sửa lỗi cần sửa.
+3. Post tất cả.
+4. Mở trang Kỳ kế toán, xem ô của công ty × kỳ: còn chip NEW / ERR / Raw / Lệch là còn việc dở.
+5. Tick ô cần khóa (hoặc checkbox cả dòng kỳ) → **Khóa (n)**. Muốn khóa một lần mọi kỳ cũ: **Khóa đến hết kỳ…** → chọn công ty và kỳ → **Xem trước**.
+6. Hộp "Khóa sổ n kỳ": xem bảng việc dở từng kỳ (Raw chưa build, Raw lỗi, event NEW, event ERROR, dòng GL, Σ Nợ, Σ Có, Nợ/Có, việc dở). Kỳ đã khóa sẵn được liệt kê "Đã khóa – bỏ qua".
+7. Nhập **Người khóa** (bắt buộc, trình duyệt nhớ cho lần sau) và **Ghi chú** nếu cần. Còn việc dở thì phải tick "Tôi đã xem cảnh báo việc dở ở trên và vẫn muốn khóa".
+8. Bấm **Khóa sổ**. Ô chuyển `LOCKED`, lịch sử có dòng `LOCK`.
+
+**Mở khóa để sửa**
+
+1. Chọn đúng 1 ô `LOCKED` → **Mở khóa**.
+2. Hộp mở khóa hiện ai khóa, lúc nào, ghi chú, số dòng sổ cái, Σ Nợ / Σ Có, việc dở; cảnh báo nếu kỳ sau còn khóa.
+3. Nhập **Người mở khóa** và **Lý do mở khóa** (tối thiểu 10 ký tự) → **Mở khóa**.
+4. Sửa dữ liệu trong phạm vi công ty + kỳ đó: Import, Unpost + Unbuild, Build, Post.
+5. **Khóa lại** theo các bước ở trên. Hệ thống không tự khóa lại.
+
+#### 4.3.8 Kiểm tra trước khi khóa
+
+Khi khóa, hệ thống đếm việc dở của từng công ty × kỳ và cảnh báo. **Chỉ cảnh báo, không chặn**; nội dung cảnh báo được lưu vào `ChecksSnapshot` của dòng lịch sử.
+
+| Mã | Nghĩa | Hệ quả sau khi khóa |
+|---|---|---|
+| `RAW_NOT_BUILT` | Dòng Raw của công ty trong kỳ chưa build | Không build được cho tới khi mở khóa |
+| `RAW_ERROR` | Dòng Raw lỗi khi build (thiếu ComCode, JournalType…) | Không build lại được |
+| `RAW_NO_COMCODE` | Dòng Raw cùng kỳ chưa xác định được công ty (chưa build hoặc lỗi) | Các dòng này không bị khóa theo công ty |
+| `EVENTS_NEW` | Event `NEW` chưa Post | Không Post được cho tới khi mở khóa |
+| `EVENTS_ERROR` | Event `ERROR` (thiếu partner, tỷ giá, tài khoản…) | Không sửa bằng Build / Post được |
+| `GL_IMBALANCED` | Σ Nợ ≠ Σ Có của sổ cái trong kỳ (lệch từ 0,005) | Số đã chốt đang lệch |
+| `NO_DATA` | Kỳ chưa có dữ liệu | Chỉ là thông tin: khóa trước để chặn nhập nhầm. Không tính là việc dở, không cần tick xác nhận |
+
+- Dòng Raw đếm theo ComCode đang lưu trên dòng × kỳ (Orders: ngày giao; PayPal, Stripe, PingPong: ngày giao dịch); event và sổ cái theo cột `ComCode`, `Period`.
+- **Vì sao không chặn:** Orders đang có 2.388 event lỗi `MISSING_PARTNER` do lỗi nhận diện store (mục 12.4), chưa sửa nhanh được; chặn thì không khóa được kỳ nào. Cảnh báo được lưu lại nên vẫn biết lúc khóa kỳ còn dở gì. Có chuyển sang chặn hay không là câu hỏi mở (mục 23.4).
+
+#### 4.3.9 Lịch sử khóa / mở khóa
+
+- Mỗi lần khóa hoặc mở khóa thành công ghi 1 dòng `AccountingPeriodLog` (mục 4.3.2). Khóa lại kỳ đã khóa sẵn không ghi.
+- Không có chức năng sửa hay xóa lịch sử; "Xóa dữ liệu test" không xóa.
+- Xem bằng nút **Lịch sử** trên trang Kỳ kế toán: chọn đúng 1 ô thì lọc theo ô đó (bỏ lọc bằng dấu ×); lọc thêm theo thao tác `LOCK` / `UNLOCK`; mới nhất ở trên.
+- Cột `ChecksSnapshot` hiện tóm tắt "n việc dở" (rê chuột xem chi tiết) hoặc "Không việc dở", kèm số dòng sổ cái và Σ Nợ; mở rộng dòng để xem đầy đủ.
+
+#### 4.3.10 Chưa làm
+
+| Việc | Ghi chú |
+|---|---|
+| Đóng kỳ vĩnh viễn | Như Oracle "Permanently Closed", Odoo "Hard lock". Để dành khi có đăng nhập và phân quyền |
+| Phân quyền khóa / mở khóa | Gốc: chỉ Kế toán trưởng, Admin (mục 20). Hiện ai cũng làm được, chỉ bắt gõ tên |
+| Khóa theo nguồn / phân hệ | Vd khóa Orders trong khi sao kê PayPal, Stripe, PingPong của tháng còn về (như NetSuite khóa riêng A/R, A/P) |
+| Tự chuyển dữ liệu muộn sang kỳ mở kế tiếp | Như Odoo, Oracle AP |
+| Bút toán đảo / điều chỉnh vào kỳ đang mở | Theo Luật Kế toán Điều 27, VAS 29 |
+| Chặn ngày tương lai | Hiện nhận dòng ngày bất kỳ nếu kỳ chưa khóa |
+| Khóa tuần tự | Bắt khóa kỳ trước rồi mới khóa kỳ sau (như NetSuite) |
+| Khóa theo công ty cha | Cần cây công ty (mục 4.1) |
+| Số kỳ đang khóa trên Dashboard | Hiện chỉ xem ở trang Kỳ kế toán |
+
+#### 4.3.11 Tham khảo phần mềm khác và quy định
+
+**Phần mềm kế toán**
+
+| Phần mềm | Đơn vị khóa | Trạng thái | Mở lại | Dữ liệu muộn |
+|---|---|---|---|---|
+| Oracle General Ledger | Theo sổ (ledger); kỳ phân hệ (AR, AP) quản lý riêng | Never Opened, Future Entry, Open, Closed, Permanently Closed; AR có thêm Close Pending | Closed mở lại bất cứ lúc nào; Permanently Closed không mở lại | AP "sweep" chuyển giao dịch chưa hạch toán sang kỳ mở kế tiếp |
+| SAP S/4HANA (OB52) | Biến thể kỳ ghi sổ dùng chung cho nhiều công ty; mở theo khoảng kỳ và loại tài khoản | Mở / đóng theo khoảng; khoảng 1 giới hạn theo nhóm quyền; kỳ đặc biệt 13–16 | Sửa khoảng mở | Chứng từ ghi vào kỳ đóng bị báo lỗi; lệnh chạy hàng loạt báo lỗi từng chứng từ, không hủy cả lệnh |
+| Microsoft Dynamics 365 Finance | Theo pháp nhân; quyền theo phân hệ | Open, On hold, Permanently closed | On hold mở lại được; Permanently closed không; cập nhật hàng loạt nhiều pháp nhân | Không ghi được vào kỳ không Open |
+| Business Central | Theo công ty và theo người dùng (Allow Posting From/To) | Khoảng ngày được ghi sổ | Sửa khoảng ngày; Close Year không đảo ngược | Không ghi được ngoài khoảng |
+| NetSuite | Theo kỳ; OneWorld theo công ty con | Lock A/R, Lock A/P, Lock Payroll, Lock All → Close | Mở lại cần Justification và mở cả các kỳ đóng sau nó; đóng kỳ yêu cầu kỳ trước đã đóng | Mặc định vào kỳ mở hiện tại |
+| Odoo 17/18 | Theo công ty, bằng ngày khóa | Ngày khóa cho người dùng thường (non-advisers), cho mọi người, cho thuế; v18 thêm ngày khóa bán hàng / mua hàng / toàn bộ và Hard lock | Lùi ngày khóa; Hard lock không đảo ngược; ngoại lệ có lý do được ghi lại | Tự dời sang ngày sau ngày khóa |
+| Xero, QuickBooks Online | Theo tổ chức, bằng ngày khóa | Xero: period lock date + adviser lock date. QBO: ngày chốt sổ (closing date), mật khẩu tùy chọn | Sửa ngày khóa | QBO có báo cáo "Exceptions to Closing Date" liệt kê giao dịch thuộc kỳ đã chốt bị thêm / sửa sau khi chốt |
+| MISA AMIS / SME | Theo ngày; công ty mẹ khóa được chi nhánh; khóa theo loại chứng từ, phân hệ, người dùng | Ngày khóa sổ; khi khóa phải xử lý chứng từ chưa ghi sổ | Bỏ khóa = lùi ngày khóa; có nhật ký truy cập | Không nhập được chứng từ trước ngày khóa |
+| FAST Accounting | Theo ngày và theo loại chứng từ | Khóa nhập liệu + đóng kỳ tính số dư | Sửa ngày khóa | Không nhập được vào kỳ đã khóa |
+| **Sky Finance** | Công ty × tháng | `OPEN`, `LOCKED` | Bất cứ lúc nào, bắt buộc tên + lý do, có lịch sử | Import từ chối dòng; mở khóa → Import → Build → Post → khóa lại |
+
+**Quy định**
+
+| Văn bản | Nội dung liên quan |
+|---|---|
+| Luật Kế toán 88/2015/QH13, Điều 12 | Kỳ kế toán năm, quý, tháng; kỳ tháng từ ngày đầu đến hết ngày cuối tháng |
+| Luật Kế toán, Điều 26 | Khóa sổ kế toán cuối kỳ trước khi lập báo cáo tài chính |
+| Luật Kế toán, Điều 27 | Sửa sổ bằng cải chính, ghi số âm hoặc chứng từ điều chỉnh; sổ điện tử dùng chứng từ điều chỉnh; sai sót phát hiện sau khi nộp báo cáo tài chính sửa trên sổ của năm phát hiện |
+| Thông tư 200/2014/TT-BTC, Điều 124–125 | Khóa sổ trước khi lập báo cáo tài chính; sai sót trọng yếu điều chỉnh hồi tố theo VAS 29 |
+| Thông tư 99/2025/TT-BTC, Điều 13 (áp dụng từ năm tài chính 2026) | Giữ quy định khóa sổ |
+| VAS 29 | Sai sót trọng yếu của kỳ trước được điều chỉnh hồi tố |
+| CRA IC05-1R1 (Canada, áp dụng cho ONTARIO) | Hồ sơ điện tử phải có dấu vết kiểm tra (audit trail); sửa giao dịch đã ghi bằng bút toán, không sửa đè; lưu 6 năm |
+
+**Lựa chọn của hệ thống và lý do**
+
+| Lựa chọn | Lý do |
+|---|---|
+| Khóa theo công ty × tháng | Như D365 (pháp nhân), Oracle (sổ), NetSuite (công ty con); Luật Kế toán Điều 12 lấy tháng làm kỳ; event và sổ cái đều đã có `ComCode` và `Period` |
+| Chỉ `OPEN` / `LOCKED`, mở lại được | Chưa có đăng nhập nên chưa có ai đủ quyền đóng vĩnh viễn; để dành khi có phân quyền |
+| Mở khóa bắt buộc tên + lý do, có lịch sử | Như Justification của NetSuite; yêu cầu lưu vết của phần mềm kế toán (Thông tư 103/2005/TT-BTC, CRA IC05-1R1) |
+| Việc dở chỉ cảnh báo | MISA bắt xử lý chứng từ chưa ghi sổ, nhưng ở đây 2.388 event lỗi `MISSING_PARTNER` của Orders chưa sửa nhanh được (mục 4.3.8) |
+| Thứ tự tự do + "Khóa đến hết kỳ" | "Khóa đến hết kỳ" cho cùng hiệu quả với ngày khóa của Odoo / MISA; không bắt tuần tự như NetSuite để khóa được ngay kỳ đã chốt dù kỳ trước còn dở |
+| Dữ liệu muộn bị từ chối khi Import | Như MISA, FAST. Tự dời sang kỳ sau (Odoo, Oracle AP) để làm sau vì cần chốt cách hạch toán |
+| Lệnh phạm vi rộng bỏ qua phần kỳ khóa | Như SAP, Oracle: lệnh chạy hàng loạt báo từng phần không ghi được thay vì hủy cả lệnh; kế toán không phải chia nhỏ phạm vi quanh kỳ khóa |
+
+**Khác tài liệu gốc:**
+
+- Gốc: kỳ `LOCKED` không cho chạy các thao tác Build, Post, Unpost, Unbuild, Unpost + Unbuild. Hệ thống: lệnh vẫn chạy phần kỳ mở, bỏ qua phần kỳ khóa và báo số lượng; lệnh mà cả phạm vi đều thuộc kỳ khóa thì không làm gì (Unpost, Unbuild báo trước và không chạy).
+- Gốc: không cho thay Raw ở kỳ khóa. Hệ thống: từ chối từng dòng (cả dòng mới), dòng khác trong file vẫn được nhận.
+- Gốc có yêu cầu chặn "sửa raw": hệ thống chưa có chức năng sửa Raw trên web nên chưa cần chặn.
+- Gốc tính kỳ theo ComCode / Period của phạm vi Import. Hệ thống: Orders theo ngày giao + công ty theo cổng thanh toán (hiện tại và đã lưu); ngân hàng theo ngày giao dịch + cột `ComCode` trên file.
+- Thêm `UnlockedBy`, `UnlockedAt`, `Note`, `ModifiedDate` và bảng lịch sử `AccountingPeriodLog`; gốc chỉ có `LockedBy`, `LockedAt`, `UnlockReason`.
+- Chưa phân quyền khóa / mở khóa (mục 20).
+- Thêm: "Xóa dữ liệu test" (không có trong gốc) bị từ chối khi còn kỳ khóa.
 
 ---
 
@@ -253,7 +531,7 @@ Kỳ `LOCKED` phải chặn mọi thao tác làm thay đổi dữ liệu của k
 | `PIPO` | Sao kê PingPong | .csv, hoặc sheet `Bank_Pipo` | `Status = Success` | Đã làm |
 | `AccountingSource` | Nguồn kế toán tổng hợp / nhập tay; gốc yêu cầu sửa được dữ liệu trên web theo quyền | – | – | Chưa làm |
 
-Import lưu **mọi dòng** của file; việc bỏ qua dòng không đủ điều kiện làm ở bước Build và có ghi lý do.
+Import lưu **mọi dòng** của file; việc bỏ qua dòng không đủ điều kiện làm ở bước Build và có ghi lý do. Ngoại lệ: dòng thuộc kỳ đã khóa sổ bị từ chối ngay khi Import (mục 4.3.4).
 
 ### 5.2 Bước 0: Xử lý dữ liệu thô (Điền trước – PREFILL)
 
@@ -302,27 +580,37 @@ Import lưu **mọi dòng** của file; việc bỏ qua dòng không đủ đi�
 | Tình huống | Hệ thống xử lý |
 |---|---|
 | Khóa dòng chưa có | Thêm mới, trạng thái chưa build |
-| Đã có, nội dung giống hệt | Bỏ qua |
-| Đã có, nội dung đổi, dòng chưa build | Thay thế, đưa về chưa build |
+| Đã có, nội dung giống hệt | Bỏ qua (kể cả khi dòng thuộc kỳ khóa) |
+| Dòng mới, hoặc nội dung đổi, thuộc kỳ đã khóa sổ (giá trị mới **hoặc** giá trị cũ) | Từ chối dòng: "Dòng thuộc ZENIROXPAY kỳ 202511 đã khóa sổ → không nhận. Muốn ghi: mở khóa … rồi import lại" |
+| Nội dung đổi, dòng còn nằm trong event thuộc kỳ khóa | Từ chối dòng: "Dòng còn nằm trong event … thuộc … đã khóa sổ → không cho thay…" |
+| Nội dung đổi, dòng còn nằm trong event **đã ghi sổ** | Từ chối dòng: "Dòng đã ghi sổ (event …, POSTED) và dữ liệu thay đổi → Unpost + Unbuild … công ty X kỳ P trước khi import lại" |
+| Nội dung đổi, dòng còn nằm trong event **chưa ghi sổ** | Từ chối dòng: "Dòng còn nằm trong AccountingEvent chưa post (…) và dữ liệu thay đổi → Unbuild … công ty X kỳ P trước khi import lại" |
 | Nội dung đổi, dòng đã build | Từ chối dòng: "Unbuild trước khi import lại" |
-| Orders: nội dung đổi, dòng còn nằm trong event đã ghi sổ | Từ chối: "Unpost + Unbuild công ty X kỳ P trước" |
+| Đã có, nội dung đổi, dòng chưa build, không còn event nào | Thay thế, đưa về chưa build |
 | Khóa dòng trùng trong cùng file | Lỗi dòng |
 | Thiếu khóa dòng, ngày không đọc được | Lỗi dòng |
 
+- Thứ tự xét mỗi dòng: lỗi đọc dòng, trùng trong file → giống hệt dòng đã có (bỏ qua) → kỳ khóa (từ chối) → thêm mới, thay thế, hoặc từ chối vì đã build / còn event. Công ty và ngày dùng để xét kỳ khóa: mục 4.3.4.
+- "Còn event" xét khác nhau theo nguồn:
+  - **Orders:** dòng đã build báo "Unbuild trước khi import lại"; dòng chưa build (vd lỗi build sau khi gỡ mapping cổng) mà dòng hàng còn nằm trong event nào đó thì báo theo event.
+  - **PayPal, Stripe, PingPong:** dòng còn event sinh từ nó (cùng khóa dòng) luôn báo theo event, dù trạng thái build là gì; "Unbuild trước khi import lại" chỉ còn cho dòng đã build mà không sinh event nào.
+  - Hai loại lời nhắn: event đã ghi sổ thì phải Unpost + Unbuild; event chưa ghi sổ thì chỉ cần Unbuild. Lời nhắn nêu event, công ty và kỳ cần làm.
+- Unbuild riêng (không kèm Unpost) giữ event đã ghi sổ, nên dòng của event đó vẫn ở trạng thái đã build và Import lại vẫn bị từ chối. Muốn sửa dòng đã ghi sổ: Unpost + Unbuild rồi mới Import lại (mục 15).
 - Import chỉ thêm hoặc thay từng dòng theo khóa dòng, **không bao giờ xóa** dòng Raw: dòng có ở lần Import trước mà không còn trong file mới vẫn được giữ và vẫn được Build.
-- Unpost / Unbuild không xóa Raw, chỉ đưa dòng về chưa build. Cách duy nhất xóa Raw là nút "Xóa dữ liệu test" ở Dashboard: xóa toàn bộ Raw, event, sổ cái, nhật ký (giữ danh mục), không có bước xem trước.
+- Unpost / Unbuild không xóa Raw, chỉ đưa dòng về chưa build. Cách duy nhất xóa Raw là nút "Xóa dữ liệu test" ở Dashboard: xóa toàn bộ Raw, event, sổ cái, nhật ký (giữ danh mục và bảng kỳ kế toán), không có bước xem trước; **bị từ chối khi còn kỳ đang khóa sổ**.
 
-**Khác tài liệu gốc:** gốc yêu cầu Import lại thay thế toàn bộ Raw trong phạm vi (nguồn + công ty / kỳ) và không cho thay ở kỳ khóa. Hiện chỉ thay từng dòng theo khóa dòng và chưa chặn kỳ khóa.
+**Khác tài liệu gốc:** gốc yêu cầu Import lại thay thế toàn bộ Raw trong phạm vi (nguồn + công ty / kỳ) và không cho thay ở kỳ khóa. Hiện chỉ thay từng dòng theo khóa dòng; dòng thuộc kỳ khóa bị từ chối từng dòng, các dòng khác trong file vẫn được nhận (mục 4.3).
 
 ### 5.6 Nhật ký Import (ImportBatch)
 
 - Mỗi lần Import lưu: nguồn, tên file, thời gian, trạng thái, tổng số dòng, số dòng thành công (thêm mới + thay thế gộp chung), bỏ qua, lỗi, và chi tiết lỗi (tối đa 500 dòng lỗi đầu). Số thêm mới / thay thế tách riêng chỉ hiện trong hộp kết quả ngay sau khi Import.
+- Dòng bị từ chối vì kỳ khóa tính vào số dòng lỗi, lý do ghi ở chi tiết lỗi. Hộp kết quả hiện thêm "Từ chối do kỳ khóa" khi có; nhật ký Import không lưu riêng số này.
 - Trạng thái: `SUCCESS` (không lỗi), `PARTIAL` (có dòng lỗi nhưng vẫn có dòng được nhận hoặc bỏ qua), `FAILED` (thiếu cột bắt buộc, hoặc mọi dòng đều lỗi). File không đọc được (sai đuôi file, .xlsx thiếu sheet của nguồn, file hỏng) bị báo lỗi ngay, không tạo nhật ký.
 - Xem ở tab Lịch sử import của trang Raw; mở từng dòng để xem lỗi.
 
 **Khác tài liệu gốc:**
 - Import không theo phạm vi ComCode/kỳ; ImportBatch không lưu ComCode, kỳ, người upload.
-- Chưa chặn Import vào kỳ đã khóa (chưa có khóa kỳ) và vào công ty không được ghi sổ (gốc: chỉ công ty có `IsPostingEnabled` và không phải `REPORTING_NODE`).
+- Chưa chặn Import vào công ty không được ghi sổ (gốc: chỉ công ty có `IsPostingEnabled` và không phải `REPORTING_NODE`). Import vào kỳ đã khóa thì đã chặn, theo từng dòng (mục 4.3.4).
 
 ---
 
@@ -352,8 +640,10 @@ Danh mục JournalType đã có sẵn 16 loại nghiệp vụ của nguồn Acco
   - Event chưa ghi sổ được thay bằng bản mới; event không còn được sinh ra thì bị xóa.
   - Event đã ghi sổ được giữ nguyên. Nếu dữ liệu nguồn hoặc cấu hình đã đổi, hệ thống cảnh báo `POSTED_SOURCE_CHANGED`; muốn cập nhật phải Unpost → Build → Post.
   - Dòng đã ghi sổ dưới một khóa khác (đổi công ty, ngày giao, RuleSeq) bị chặn với lỗi `POSTED_KEY_CHANGED`.
+  - PayPal, Stripe, PingPong: một dòng sao kê chỉ có một bộ event. Dòng đã ghi sổ mà lần Build này ra loại nghiệp vụ khác (vd cột `JournalType` để trống và danh mục đổi tên gốc) cũng bị chặn với `POSTED_KEY_CHANGED`, không sinh event mới bên cạnh event đã ghi sổ.
 - Dòng không đủ điều kiện được đánh dấu bỏ qua hoặc lỗi, có lý do, ghi vào danh sách exception.
 - Trạng thái dòng Raw: `NOT_BUILT` (chưa build) → `BUILT` / `SKIPPED` / `ERROR`.
+- **Kỳ đã khóa sổ:** Build bỏ qua phần thuộc kỳ khóa: không tạo, thay, xóa event của kỳ; không đổi trạng thái dòng Raw của kỳ; giữ exception cũ của kỳ. Event của kỳ khóa ở **mọi trạng thái** được coi như đã ghi sổ khi chống ghi sổ trùng: dòng ở kỳ mở đụng vào nó bị chặn với lỗi `PERIOD_LOCKED`. Hộp kết quả báo số bị bỏ qua; exception INFO `PERIOD_LOCKED` tóm tắt theo nguồn × công ty × kỳ (mục 4.3.5).
 
 **Bản ghi AccountingEvent**
 
@@ -525,6 +815,7 @@ Trang Events (`/events`).
 - Mỗi lần Post ghi trong một giao dịch dữ liệu: có lỗi thì hủy toàn bộ lần Post đó.
 - Thành công: event chuyển `POSTED`, lưu số chứng từ, lần Post, khóa gom, thời điểm Post.
 - Mỗi event sinh **đúng 1 dòng Nợ và 1 dòng Có** theo rule của nó (thứ tự xử lý ở mục 10.3).
+- **Kỳ đã khóa sổ:** event thuộc kỳ khóa không được Post, đứng yên cho tới khi mở khóa. Kết quả Post có cột "Kỳ khóa (bỏ qua)" và cảnh báo liệt kê kỳ; exception INFO `PERIOD_LOCKED` bước Post tóm tắt theo nguồn × công ty × kỳ (mục 4.3.5). Việc chặn trùng dòng hàng vẫn tính cả event của kỳ khóa.
 
 **Khác tài liệu gốc:** gốc chỉ Post event `NEW`, và có xem trước (preview) trước khi Post; hiện chỉ có kết quả sau khi chạy.
 
@@ -783,7 +1074,7 @@ Công ty ZENIROXPAY hạch toán USD nên tỷ giá luôn là 1.
 2. Thêm rule: `RuleSeq` không trùng trong mã; chọn vai trò tài khoản Nợ/Có; `AmountSource` đúng với nguồn; `NegativeMode`.
 3. Nguồn ngân hàng: kiểm tra MappingBankAccount đã có dòng cho công ty.
 4. Đưa các dòng chỉ có trong hệ thống lên Sheet trước, rồi bấm Sync (mục 22).
-5. Nếu nghiệp vụ đã có số liệu ghi sổ: Unpost → Build → Post. Kiểm tra trang Exceptions.
+5. Nếu nghiệp vụ đã có số liệu ghi sổ: Unpost → Build → Post. Kiểm tra trang Exceptions. Kỳ đã khóa sổ không bị đổi theo cấu hình mới (Build / Post bỏ qua); muốn áp cho kỳ đó phải mở khóa trước (mục 4.3.7).
 
 Hiệu lực của thay đổi:
 
@@ -793,6 +1084,7 @@ Hiệu lực của thay đổi:
 | Rule (vai trò tài khoản, hệ số, `NegativeMode`, đối tượng, diễn giải), `Classify`, CoA, tỷ giá | Lần Post sau (event chưa ghi sổ); event đã ghi sổ phải Unpost |
 | Thêm / tắt rule, đổi `AmountSource` | Build lại |
 | `RuleSeq` | Build lại; nếu đã ghi sổ sẽ báo `POSTED_KEY_CHANGED` |
+| Tên gốc (`JournalType.JournalType`) dùng để tra dòng sao kê để trống cột `JournalType` | Build lại; dòng đã ghi sổ mà nay ra mã nghiệp vụ khác sẽ báo `POSTED_KEY_CHANGED` |
 
 ---
 
@@ -874,7 +1166,7 @@ Bảng `MappingBankAccount`: `ComCode`, `BankAccountNumber`, `InputCurr`, `GLAcc
 
 ## 14. GLTrans
 
-Người dùng không sửa trực tiếp sổ cái; mọi thay đổi đi qua Unpost → (Unbuild) → Build → Post.
+Người dùng không sửa trực tiếp sổ cái; mọi thay đổi đi qua Unpost → (Unbuild) → Build → Post. Sổ cái của kỳ đã khóa phải mở khóa trước (mục 4.3).
 
 | Nhóm | Cột | Ghi chú |
 |---|---|---|
@@ -900,21 +1192,35 @@ Truy ngược: dòng sổ cái → chứng từ → event (qua `DocNum` = `Poste
 | Thao tác | Phạm vi | Kết quả |
 |---|---|---|
 | Unpost | Công ty + nguồn + khoảng kỳ, hoặc một lần Post | Xóa dòng sổ cái theo **cả chứng từ**; event `POSTED` về `NEW`, xóa thông tin Post; lần Post không còn dòng nào chuyển `UNPOSTED`. Event `SKIPPED` và `ERROR` giữ nguyên; dòng Raw vẫn `BUILT` |
-| Unbuild | Công ty + nguồn + khoảng kỳ | Xóa event chưa ghi sổ; event `POSTED` được giữ và báo số lượng; xóa exception bước Build trong phạm vi. Dòng Raw: **Orders** về `NOT_BUILT` khi không còn event nào chứa nó; **PayPal / Stripe / PingPong** về `NOT_BUILT` **toàn bộ** trong phạm vi, kể cả dòng còn event đã ghi sổ (xem cảnh báo dưới) |
+| Unbuild | Công ty + nguồn + khoảng kỳ; để trống ô nguồn là cả 4 nguồn | Xóa event chưa ghi sổ; event `POSTED` được giữ và báo số lượng; xóa exception bước Build trong phạm vi. Dòng Raw về `NOT_BUILT` khi không còn event nào của nó (**Orders:** không còn event nào chứa dòng hàng; **PayPal / Stripe / PingPong:** không còn event nào sinh từ dòng). Dòng còn event đã ghi sổ **giữ `BUILT`** (xem lưu ý dưới) |
 | Unpost + Unbuild | Như trên | Unpost rồi Unbuild trong cùng một giao dịch dữ liệu |
 
 - Mọi thao tác đều **xem trước số lượng** bị ảnh hưởng rồi mới chạy.
 - Event `SKIPPED`: chỉ cần Build lại phạm vi đó; Build thay mọi event chưa ghi sổ bằng bản mới `NEW`.
+- **Kỳ đã khóa sổ:** phần thuộc kỳ khóa luôn giữ nguyên, phần kỳ mở vẫn chạy (mục 4.3.4, 4.3.5).
+  - Unpost bỏ qua chứng từ của kỳ khóa (một chứng từ luôn thuộc 1 công ty × 1 kỳ nên không bao giờ gỡ dở); lần Post còn dòng sổ cái của kỳ khóa giữ `SUCCESS`.
+  - Unbuild giữ event của kỳ khóa ở mọi trạng thái, dòng Raw và exception của kỳ. Dòng Raw còn nằm trong event kỳ khóa cũng giữ `BUILT` (Orders: theo dòng hàng; PayPal, Stripe, PingPong: event sinh từ dòng); dòng Raw Orders được xét theo ComCode đang lưu trên dòng (không xét mapping hiện tại).
+  - Hộp xác nhận báo phần giữ nguyên: "Giữ nguyên n chứng từ (m event)" (Unpost), "Giữ nguyên n event, m dòng raw[, k chứng từ]" (Unbuild, Unpost + Unbuild). Nếu cả phạm vi thuộc kỳ khóa: hệ thống báo và không chạy.
 
-> ⚠️ **PayPal / Stripe / PingPong: khi phạm vi có event đã ghi sổ, dùng Unpost + Unbuild, không dùng Unbuild riêng.** Unbuild riêng đưa cả dòng đã ghi sổ về chưa build, nên chốt chặn khi Import lại không còn tác dụng với các dòng đó; sửa cột điền tay (vd `JournalType`) rồi Import và Build lại có thể sinh event mới và **ghi sổ trùng**. Ngoài ra, Unbuild để trống ô nguồn chỉ đưa dòng Raw Orders về chưa build; dòng Raw ngân hàng vẫn `BUILT` dù event đã bị xóa (mục 23.3).
+> **Sửa dòng đã ghi sổ: dùng Unpost + Unbuild, không dùng Unbuild riêng.** Unbuild riêng giữ event đã ghi sổ và giữ `BUILT` các dòng Raw của chúng. Hộp xác nhận báo "n event đã POSTED sẽ giữ lại (cần Unpost trước); dòng raw của chúng giữ BUILT nên chưa import lại được". Import lại dòng đó bị từ chối; với PayPal, Stripe, PingPong lời nhắn nêu nguồn, công ty, kỳ cần Unpost + Unbuild (mục 5.5).
+>
+> **PayPal / Stripe / PingPong**, vd sửa cột điền tay `JournalType` của dòng đã ghi sổ: Unpost + Unbuild đúng nguồn, công ty, kỳ → Import lại → Build → Post. Nếu dòng đã ghi sổ vẫn ra loại nghiệp vụ khác mà không qua Import (vd dòng để trống cột `JournalType` và danh mục đổi tên gốc), Build chặn bản mới bằng lỗi `POSTED_KEY_CHANGED` thay vì ghi sổ trùng (mục 7.1).
+>
+> **Để trống ô nguồn:** Unbuild xử lý cả 4 nguồn. Dòng Raw PayPal, Stripe, PingPong không còn event nào cũng về chưa build, và exception bước Build của các nguồn này được xóa như khi Unbuild từng nguồn.
+>
+> Trước bản sửa, Unbuild PayPal / Stripe / PingPong đưa cả dòng đã ghi sổ về chưa build (có thể dẫn tới ghi sổ trùng), còn Unbuild để trống ô nguồn bỏ sót dòng Raw ngân hàng.
 
-**Khác tài liệu gốc:** chưa chặn kỳ khóa; chưa ghi audit log.
+**Khác tài liệu gốc:**
+- Gốc: kỳ `LOCKED` không cho chạy. Hệ thống: vẫn chạy phần kỳ mở, giữ nguyên phần kỳ khóa và báo số lượng (mục 4.3.5).
+- Chưa ghi audit log (riêng khóa / mở khóa kỳ đã có lịch sử, mục 4.3.9).
 
 ---
 
 ## 16. Run Accounting Cycle
 
 **Hiện có:** nút "Chạy full cycle (Build + Post)" trên Dashboard: Build Orders cho toàn bộ dữ liệu, thành công thì Post tất cả (Single → Bulk) event `NEW` của **mọi nguồn**. Không build PayPal, Stripe, PingPong; không chọn phạm vi; không có nhật ký từng bước.
+
+Kỳ đã khóa sổ bị bỏ qua ở cả 2 bước như mục 4.3.5; Build vẫn thành công nên Post vẫn chạy. Thông báo kết quả ghi thêm "bỏ qua X event kỳ khóa" riêng cho Build và cho Post (không cộng lại, vì cùng một event `NEW` của kỳ khóa có thể được đếm ở cả 2 bước).
 
 **Yêu cầu gốc:**
 
@@ -952,6 +1258,8 @@ Truy ngược: dòng sổ cái → chứng từ → event (qua `DocNum` = `Poste
 
 Chưa có bộ lọc theo phạm vi (công ty, kỳ).
 
+Nút "Xóa dữ liệu test": mô tả ghi rõ giữ danh mục và trạng thái kỳ kế toán; **bị từ chối khi còn kỳ đang khóa sổ** (thông báo lỗi liệt kê tối đa 5 kỳ, mở khóa ở trang Kỳ kế toán). Dashboard chưa hiện số kỳ đang khóa; xem ở trang Kỳ kế toán.
+
 ---
 
 ## 18. Log / Audit / Exception
@@ -963,7 +1271,8 @@ Chưa có bộ lọc theo phạm vi (công ty, kỳ).
 | ImportBatch | Mỗi lần Import: nguồn, tên file, số dòng theo kết quả, lỗi từng dòng, trạng thái |
 | BuildBatch | Mỗi lần Build: phạm vi, tóm tắt kết quả, trạng thái `RUNNING` / `SUCCESS` / `FAILED` |
 | PostingBatch | Mỗi lần Post: Single hoặc Bulk, số chứng từ và dòng, trạng thái `SUCCESS` / `FAILED` / `UNPOSTED` |
-| ExceptionLog | Mỗi cảnh báo / lỗi của Build và Post: bước, mức, loại, dòng liên quan, nội dung, lần chạy. Riêng Build PayPal / Stripe / PingPong: gom theo loại + mức + công ty thành 1 dòng (kèm số dòng và tối đa 3 mã mẫu, không có kỳ); chi tiết từng dòng xem cột BuildMessage ở trang Raw |
+| ExceptionLog | Mỗi cảnh báo / lỗi của Build và Post: bước, mức, loại, dòng liên quan, nội dung, lần chạy. Riêng Build PayPal / Stripe / PingPong: gom theo loại + mức + công ty thành 1 dòng (kèm số dòng và tối đa 3 mã mẫu, không có kỳ); chi tiết từng dòng xem cột BuildMessage ở trang Raw. Tóm tắt INFO `PERIOD_LOCKED` của bước Post không gắn lần Post nào |
+| AccountingPeriodLog | Mỗi lần khóa / mở khóa kỳ: công ty, kỳ, thao tác, trạng thái trước / sau, người thao tác (gõ tên), ghi chú hoặc lý do, việc dở lúc thao tác. Chỉ thêm, không sửa / xóa (mục 4.3.9) |
 
 ### 18.2 Danh sách loại exception
 
@@ -986,8 +1295,10 @@ Mức: **INFO** – bình thường, để biết · **WARNING** – vẫn chạ
 | `NEGATIVE_AMOUNT` | Post | ERROR | Số âm với `NegativeMode = ERROR` | Kiểm tra dữ liệu hoặc đổi chế độ |
 | `MISSING_FX` | Post | ERROR | Thiếu tỷ giá của kỳ / cặp tiền | Thêm tỷ giá, Post lại |
 | `POSTED_SOURCE_CHANGED` | Build | WARNING | Event đã ghi sổ nhưng dữ liệu nguồn / cấu hình đã đổi, hoặc không còn được sinh ra | Unpost → Build → Post |
-| `POSTED_KEY_CHANGED` | Build | ERROR | Dòng hàng đã ghi sổ dưới khóa khác (đổi công ty, ngày giao, RuleSeq) | Unpost công ty / kỳ cũ → Build → Post |
+| `POSTED_KEY_CHANGED` | Build | ERROR | Dòng hàng đã ghi sổ dưới khóa khác (đổi công ty, ngày giao, RuleSeq); dòng sao kê đã ghi sổ nay ra loại nghiệp vụ khác | Unpost công ty / kỳ cũ → Build → Post |
 | `DUPLICATE_ITEM` | Post | ERROR | Dòng hàng đã / đang ghi sổ ở event khác | Build lại phạm vi rộng hơn, rồi Post |
+| `PERIOD_LOCKED` | Build / Post | INFO | Tóm tắt số dòng nguồn / event mà Build (hoặc Post) bỏ qua vì thuộc kỳ đã khóa sổ. 1 dòng cho mỗi nguồn × công ty × kỳ, thay mới mỗi lần chạy (không cộng dồn); mở khóa kỳ thì bị xóa | Bình thường, dữ liệu kỳ khóa giữ nguyên. Muốn ghi lại: mở khóa kỳ (mục 4.3.7) |
+| `PERIOD_LOCKED` | Build | ERROR | Dòng ở kỳ mở đụng event thuộc kỳ khóa (đổi ngày, đổi cổng thanh toán sang công ty khác, hoặc trùng dòng hàng) → không ghi, hoặc ghi event `ERROR`, để không ghi sổ trùng (mục 4.3.5) | Mở khóa kỳ đó (ghi lý do), Unpost + Unbuild kỳ đó, Build + Post lại, khóa lại |
 | `INVALID_FULFILLED_DATE` | – | – | Đã khai báo, chưa dùng | – |
 
 ### 18.3 Trang Exceptions
@@ -995,7 +1306,7 @@ Mức: **INFO** – bình thường, để biết · **WARNING** – vẫn chạ
 Tổng hợp theo bước × mức × loại (bấm để lọc), danh sách chi tiết 100 dòng mỗi trang, lọc theo bước, mức, loại, công ty, tìm theo mã dòng / nội dung.
 
 **Khác tài liệu gốc:**
-- Chưa có **Operation Audit Log**. Gốc yêu cầu lưu vết bắt buộc các thao tác: upload/import, thay raw, Build, Post, Unpost, Unbuild, Unpost + Unbuild, sửa JournalType, sửa JournalLineRule, sửa tỷ giá, sửa mapping đối tượng, khóa / mở khóa kỳ.
+- Chưa có **Operation Audit Log**. Gốc yêu cầu lưu vết bắt buộc các thao tác: upload/import, thay raw, Build, Post, Unpost, Unbuild, Unpost + Unbuild, sửa JournalType, sửa JournalLineRule, sửa tỷ giá, sửa mapping đối tượng, khóa / mở khóa kỳ. Riêng khóa / mở khóa kỳ đã có lịch sử riêng (`AccountingPeriodLog`, mục 4.3.9), nhưng tên người thao tác do người dùng gõ, chưa xác thực.
 - Missing FX, Missing Mapping, Skipped / Unmatched gộp chung vào ExceptionLog, lọc theo loại; chưa có màn riêng.
 
 ---
@@ -1014,7 +1325,7 @@ Tổng hợp theo bước × mức × loại (bấm để lọc), danh sách chi
 
 ## 20. Phân quyền chức năng
 
-Hiện không có đăng nhập; ai mở được web thì làm được mọi thao tác.
+Hiện không có đăng nhập; ai mở được web thì làm được mọi thao tác, **kể cả khóa và mở khóa kỳ**. Hệ thống chỉ bắt gõ tên người thao tác (mở khóa thêm lý do tối thiểu 10 ký tự) và lưu vào lịch sử; tên không được xác thực.
 
 **Yêu cầu gốc (tối thiểu):**
 
@@ -1036,7 +1347,7 @@ Hiện không có đăng nhập; ai mở được web thì làm được mọi t
 
 ## 21. Bảng dữ liệu
 
-Thay cho phụ lục bảng tham chiếu của tài liệu gốc. Hệ thống có 18 bảng, **không có khóa ngoại**; các bảng liên kết theo giá trị và được giữ khớp bằng Unpost / Unbuild.
+Thay cho phụ lục bảng tham chiếu của tài liệu gốc. Hệ thống có 20 bảng, **không có khóa ngoại**; các bảng liên kết theo giá trị và được giữ khớp bằng Unpost / Unbuild.
 
 | Nhóm | Bảng | Vai trò | Khóa nhận diện | Ghi bởi |
 |---|---|---|---|---|
@@ -1055,7 +1366,9 @@ Thay cho phụ lục bảng tham chiếu của tài liệu gốc. Hệ thống c
 | Kết quả | `AccountingEvent` | Bút toán chờ ghi sổ | 5 cột (mục 7.1, duy nhất) | Build tạo / thay / xóa; Post, Unpost cập nhật; Unbuild xóa |
 | Kết quả | `PostingBatch` | Nhật ký Post | `PostBatchID` | Post; Unpost cập nhật |
 | Kết quả | `GLTrans` | Sổ cái | `ID`; nhóm theo `DocNum` | Post tạo; Unpost xóa |
-| Kết quả | `ExceptionLog` | Cảnh báo, lỗi | – | Build, Post; Unbuild xóa phần Build |
+| Kết quả | `ExceptionLog` | Cảnh báo, lỗi | – | Build, Post; Unbuild xóa phần Build; mở khóa kỳ xóa tóm tắt INFO `PERIOD_LOCKED` của kỳ |
+| Kỳ kế toán | `AccountingPeriod` | Trạng thái kỳ theo công ty × tháng; không có dòng = `OPEN` | `ComCode` + `Period` | Trang Kỳ kế toán (khóa / mở khóa) |
+| Kỳ kế toán | `AccountingPeriodLog` | Lịch sử khóa / mở khóa, chỉ thêm | `ID` | Trang Kỳ kế toán (khóa / mở khóa) |
 
 Danh sách cột đầy đủ: [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục 4.2.
 
@@ -1066,6 +1379,7 @@ Danh sách cột đầy đủ: [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục
 - **6 bảng lấy từ Google Sheet:** `Partners`, `JournalType`, `JournalLineRule`, `CoA`, `Exrate`, `MappingBankAccount`. Trên web chỉ xem (trang Master).
 - **Nút Sync:** tải cả 6 bảng, kiểm tra (bảng nào trống thì dừng), rồi **xóa toàn bộ và nạp lại** cả 6 bảng trong một giao dịch dữ liệu. Đồng thời **ghi đè 6 file dữ liệu mẫu (seed)** bằng dữ liệu Sheet, nên dòng chỉ có trong hệ thống mất cả ở hệ thống lẫn ở file mẫu.
 - **2 bảng sửa trên web:** `Company`, `GatewayCompanyMapping`. Hai bảng này không có trên Sheet; hệ thống chạy trên nhiều máy thì sau khi sửa phải xuất ra file dữ liệu mẫu (seed) để máy khác nhận.
+- **Kỳ kế toán** (`AccountingPeriod`, `AccountingPeriodLog`) không phải danh mục: không có trên Sheet, không có trong file dữ liệu mẫu, Sync không đụng tới. Quản lý ở trang Kỳ kế toán; trang Master có dòng dẫn tới (mục 4.3.2).
 
 | Bảng | Số dòng hiện có |
 |---|---:|
@@ -1092,6 +1406,13 @@ Danh sách cột đầy đủ: [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục
 - Tài khoản 11301001 "Rút PayPal về Bank VN – đang chuyển" đang làm trung gian chung cho rút tiền PayPal, payout Stripe và chuyển tiền PingPong, dù CoA có tài khoản riêng 11303001 "Rút PayPal về PingPong – đang chuyển".
 - 1 dòng PayPal `General Currency Conversion` được để lỗi `MISSING_JOURNAL_TYPE` có chủ đích, chờ kế toán chọn mã.
 - Build, Post, Export chạy trực tiếp trong lúc người dùng chờ: Build file Orders đầy đủ mất khoảng 23 giây lần đầu, 50–78 giây khi Build lại (phải thay toàn bộ event). Không bấm 2 lần.
+- Khóa kỳ (mục 4.3):
+  - Tên người khóa / mở khóa do người dùng gõ, không xác thực (chưa có đăng nhập).
+  - Dòng Raw chưa xác định được công ty (cổng thanh toán Orders chưa map, cột `ComCode` trống trên sao kê) không khóa được theo công ty.
+  - Exception gom nhóm của PayPal, Stripe, PingPong không có kỳ nên vẫn bị Build ghi lại và Unbuild xóa, kể cả phần của kỳ khóa.
+  - Dòng tóm tắt INFO `PERIOD_LOCKED` là số của lần chạy gần nhất chạm tới kỳ, không phải số tích lũy.
+  - Đổi GatewayCompanyMapping sang công ty đang khóa kỳ: event chưa ghi sổ của công ty cũ bị xóa khi Build lại, bản mới không được ghi, nên các đơn đó tạm không có event cho tới khi mở khóa (mục 4.3.5).
+  - `npm run db:reset` (xóa hẳn file dữ liệu, dùng trên máy phát triển) xóa cả trạng thái kỳ và lịch sử khóa; bảng kỳ không có trong file dữ liệu mẫu nên không khôi phục được.
 
 ### 23.2 Lỗi cấu hình trong danh mục
 
@@ -1123,10 +1444,8 @@ Danh sách cột đầy đủ: [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục
 | 18 | So tên store không nhận `VICBEA-`, khớp nhầm `FFT-OLD` | 2.385 lỗi `MISSING_PARTNER` Orders; ngân hàng có thể ghi sai store |
 | 19 | Tìm seller theo cột `TaxID` của người mua | Có thể gán nhầm đối tượng |
 | 20 | Tên gốc gộp bằng dấu phẩy không được tách | `PP_PROTECTION_BONUS_PAYOUT` không tự suy được |
-| mới | Unbuild PayPal / Stripe / PingPong đưa cả dòng đã ghi sổ về chưa build | Import lại không chặn dòng đã ghi sổ; có thể ghi sổ trùng (mục 15) |
-| mới | Unbuild để trống ô nguồn chỉ đưa dòng Raw Orders về chưa build | Dòng Raw ngân hàng vẫn `BUILT` dù event đã bị xóa |
 
-Số thứ tự theo [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục 13.3; các mục đã sửa không liệt kê. Dòng "mới" phát hiện khi lập tài liệu này, chưa có trong DEVELOPER_GUIDE.
+Số thứ tự theo [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục 13.3; các mục đã sửa không liệt kê. Đã sửa gần đây: #21 (Unbuild PayPal / Stripe / PingPong đưa cả dòng đã ghi sổ về chưa build) và lỗi Unbuild để trống ô nguồn bỏ sót dòng Raw ngân hàng (mục 15). Các rủi ro riêng của khóa kỳ (guide mục 13.3 #22–#24: dòng Raw thiếu ComCode không khóa theo công ty được, `npm run db:reset` xóa cả trạng thái kỳ, tên người khóa/mở khóa không xác thực) ghi ở mục 23.1.
 
 ### 23.4 Câu hỏi mở
 
@@ -1139,6 +1458,12 @@ Số thứ tự theo [DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md) mục 13.3; cá
 | 5 | Bổ sung `ContraAccount` 11202052 cho `PP_CANCEL_HOLD_DISPUTE_RESOLUTION`? |
 | 6 | Tài khoản trung gian chuyển tiền nội bộ: dùng chung 11301001 hay tách theo luồng (vd 11303001)? |
 | 7 | Bổ sung MappingBankAccount và tài khoản nội bộ cho MESSIPAY, VICBEA trước khi nhận file của 2 công ty này? |
+| 8 | Khóa kỳ có bắt tuần tự không (kỳ trước phải khóa trước kỳ sau, như NetSuite)? |
+| 9 | Ai được khóa / mở khóa kỳ (gốc: Kế toán trưởng, Admin)? Có cần đóng kỳ vĩnh viễn sau khi đã nộp báo cáo tài chính? |
+| 10 | Dữ liệu về muộn của kỳ đã khóa: mở khóa ghi vào kỳ cũ, tự chuyển sang kỳ mở kế tiếp, hay ghi bút toán điều chỉnh vào kỳ hiện tại (Luật Kế toán Điều 27, VAS 29)? |
+| 11 | Có cần khóa riêng theo nguồn (vd khóa Orders trong khi sao kê PayPal, Stripe, PingPong của tháng còn về)? |
+| 12 | Khi còn việc dở (event `NEW` / `ERROR`, Raw chưa build, sổ lệch) có chặn khóa thay vì chỉ cảnh báo? |
+| 13 | Đổi cổng thanh toán sang công ty đang khóa kỳ: chấp nhận các đơn tạm không có event cho tới khi mở khóa (mục 4.3.5), hay phải chặn việc đổi mapping? |
 
 Câu hỏi riêng của bước Điền trước: [BA_PREFILL_SOURCES.md](../BA_PREFILL_SOURCES.md) mục 9.
 
@@ -1206,30 +1531,30 @@ Kết quả chạy trên 4 file dữ liệu thật. Dùng để đối chiếu m
 | 3 Danh sách chức năng và màn hình | Theo từng dòng | Xem cột Trạng thái của bảng mục 3 |
 | 4.1 Company | Làm khác | Chưa có cây công ty cha–con |
 | 4.2 GatewayCompanyMapping | Đã làm | Bổ sung so với tài liệu gốc |
-| 4.3 Accounting Period | Chưa làm | – |
+| 4.3 Accounting Period | Làm khác | Khóa theo công ty × tháng; lệnh phạm vi rộng bỏ qua kỳ khóa thay vì không cho chạy; Import từ chối từng dòng; chưa phân quyền, chưa đóng vĩnh viễn |
 | 5.2 Điền trước (PREFILL) | Đặc tả xong, chưa code | – |
-| 5.5 Import lại | Làm khác | Chỉ thay từng dòng, không thay cả phạm vi |
-| 5.6 Nhật ký Import | Làm khác | Chưa lưu công ty, kỳ, người upload |
+| 5.5 Import lại | Làm khác | Chỉ thay từng dòng, không thay cả phạm vi; dòng thuộc kỳ khóa bị từ chối từng dòng |
+| 5.6 Nhật ký Import | Làm khác | Chưa lưu công ty, kỳ, người upload; chưa chặn công ty không được ghi sổ |
 | 6 Manual Entry | Chưa làm | – |
-| 7.1 Nguyên tắc Build | Đã làm | Chưa lọc theo loại nghiệp vụ |
+| 7.1 Nguyên tắc Build | Đã làm | Chưa lọc theo loại nghiệp vụ; bỏ qua phần kỳ khóa (mục 4.3) |
 | 7.2 Build AccountingSource | Chưa làm | – |
 | 7.3 Build Orders | Đã làm | – |
 | 7.4 Build PayPal | Làm khác | Ưu tiên cột JournalType điền tay |
 | 7.5 Build PingPong | Làm khác | Chưa sửa cột trên web; khử trùng theo khóa dòng |
 | 7.6 Build Stripe | Làm khác | Chưa theo phương án PA1 |
 | 8 Accounting Event Review | Đã làm (một phần) | – |
-| 9 Posting Engine | Làm khác | Thử lại event lỗi; chưa xem trước khi Post |
+| 9 Posting Engine | Làm khác | Thử lại event lỗi; chưa xem trước khi Post; bỏ qua event kỳ khóa |
 | 10 JournalType và JournalLineRule | Đã làm | – |
 | 11 FX Resolve | Làm khác | Một bảng Exrate, tỷ giá theo tháng |
 | 12 Partner / Seller Mapping | Làm khác | Chưa có PartnerSourceMapping |
 | 13 Bank Mapping | Làm khác | Chưa dùng tài khoản trên dòng nguồn; thiếu mapping không báo lỗi |
 | 14 GLTrans | Đã làm | – |
-| 15 Unpost / Unbuild | Đã làm | Chưa khóa kỳ, chưa audit |
-| 16 Run Accounting Cycle | Làm khác | Chỉ Build Orders rồi Post |
+| 15 Unpost / Unbuild | Làm khác | Bỏ qua phần kỳ khóa thay vì không cho chạy; chưa audit |
+| 16 Run Accounting Cycle | Làm khác | Chỉ Build Orders rồi Post; bỏ qua phần kỳ khóa |
 | 17 Dashboard | Làm khác | – |
-| 18 Log / Audit / Exception | Làm khác | Chưa có audit log |
+| 18 Log / Audit / Exception | Làm khác | Chưa có audit log; riêng khóa / mở khóa kỳ đã có lịch sử |
 | 19 Output hệ thống | Làm khác | Chỉ export sổ cái và event |
-| 20 Phân quyền | Chưa làm | – |
+| 20 Phân quyền | Chưa làm | Khóa / mở khóa kỳ chỉ bắt gõ tên (và lý do khi mở) |
 | 22 Master data và Google Sheet | Đã làm | – |
 
 ## Phụ lục D. Tài liệu liên quan

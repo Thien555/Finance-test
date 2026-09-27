@@ -22,7 +22,12 @@ export type ExceptionType =
   | "MISSING_FX"
   | "POSTED_SOURCE_CHANGED"
   | "POSTED_KEY_CHANGED"
-  | "DUPLICATE_ITEM";
+  | "DUPLICATE_ITEM"
+  /**
+   * Kỳ đã khóa sổ (guide §6.12). INFO: tóm tắt số dòng/event bị bỏ qua của 1 nguồn × công ty × kỳ khóa.
+   * ERROR: draft ở kỳ mở đụng event thuộc kỳ khóa (cùng khóa event, hoặc trùng item) → không ghi / ghi ERROR.
+   */
+  | "PERIOD_LOCKED";
 
 export interface ExceptionDraft {
   DataSource: string;

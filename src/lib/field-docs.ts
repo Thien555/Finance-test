@@ -81,6 +81,42 @@ export const EVENT_FIELD_DOCS: Record<string, string> = {
   ModifiedDate: "Thời điểm sửa gần nhất.",
 };
 
+/** Giới hạn nhập liệu khi khóa / mở khóa kỳ — dùng chung engine (kiểm tra) và trang Kỳ kế toán (form) */
+export const PERIOD_RULES = {
+  /** Lý do mở khóa tối thiểu (ký tự) */
+  unlockReasonMinLength: 10,
+  actorMaxLength: 100,
+  textMaxLength: 500,
+  /** Số kỳ tối đa trong 1 lần khóa */
+  maxTargets: 500,
+} as const;
+
+export const PERIOD_FIELD_DOCS: Record<string, string> = {
+  ComCode: "Công ty. Kỳ được khóa riêng cho từng công ty.",
+  Period: "Kỳ kế toán YYYYMM (tháng dương lịch).",
+  Status: "OPEN = đang mở (mặc định khi chưa có dòng). LOCKED = đã khóa sổ: Import, Build, Post, Unpost, Unbuild bỏ qua / từ chối dữ liệu của kỳ.",
+  LockedBy: "Người khóa lần gần nhất (gõ tên, chưa có đăng nhập).",
+  LockedAt: "Thời điểm khóa lần gần nhất.",
+  UnlockedBy: "Người mở khóa lần gần nhất.",
+  UnlockedAt: "Thời điểm mở khóa lần gần nhất.",
+  UnlockReason: "Lý do mở khóa lần gần nhất (bắt buộc khi mở khóa).",
+  Note: "Ghi chú khi khóa.",
+  ModifiedDate: "Thời điểm đổi trạng thái gần nhất.",
+};
+
+export const PERIOD_LOG_FIELD_DOCS: Record<string, string> = {
+  ID: "Mã dòng lịch sử (tăng dần).",
+  ComCode: "Công ty.",
+  Period: "Kỳ YYYYMM.",
+  Action: "LOCK = khóa, UNLOCK = mở khóa.",
+  FromStatus: "Trạng thái trước.",
+  ToStatus: "Trạng thái sau.",
+  ActorName: "Người thao tác (gõ tên).",
+  Reason: "Ghi chú khi khóa / lý do khi mở khóa.",
+  ChecksSnapshot: "Việc dở của kỳ tại thời điểm thao tác: raw chưa build/lỗi, event NEW/ERROR, số dòng GL, Σ Nợ/Có.",
+  CreatedAt: "Thời điểm thao tác.",
+};
+
 export const POSTING_BATCH_FIELD_DOCS: Record<string, string> = {
   PostBatchID: "Mã lần post. Mỗi lần bấm Post Single hoặc Post Bulk tạo 1 batch.",
   DataSource: "Nguồn giới hạn khi post (trống = tất cả).",

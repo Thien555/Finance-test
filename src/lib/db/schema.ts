@@ -5,8 +5,9 @@
  *  - Master/config : Partners, JournalType, JournalLineRule, CoA, Exrate, MappingBankAccount, Company, GatewayCompanyMapping
  *  - Raw           : ImportBatch, RawOrders
  *  - Engine        : BuildBatch, AccountingEvent, PostingBatch, GLTrans, ExceptionLog
+ *  - Kỳ kế toán    : AccountingPeriod, AccountingPeriodLog (trạng thái vận hành, không nằm trong data/seed)
  */
-import { index, integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 // ───────────────────────────── Master / config ─────────────────────────────
 
@@ -455,6 +456,49 @@ export const exceptionLog = sqliteTable(
   (t) => [index("IX_ExceptionLog_Type").on(t.BatchType, t.ExceptionType)],
 );
 
+// ───────────────────────────── Kỳ kế toán ─────────────────────────────
+
+/**
+ * Trạng thái kỳ theo công ty × tháng. Không có dòng = OPEN.
+ * LOCKED chặn mọi thao tác làm đổi dữ liệu của (ComCode, Period): Import, Build, Post, Unpost, Unbuild (guide §6.12).
+ * Không bị Sync Google Sheet hay "Xóa dữ liệu test" xóa.
+ */
+export const accountingPeriod = sqliteTable(
+  "AccountingPeriod",
+  {
+    ComCode: text("ComCode").notNull(),
+    Period: text("Period").notNull(), // YYYYMM
+    Status: text("Status").notNull().default("OPEN"), // OPEN | LOCKED
+    LockedBy: text("LockedBy"),
+    LockedAt: text("LockedAt"),
+    UnlockedBy: text("UnlockedBy"),
+    UnlockedAt: text("UnlockedAt"),
+    UnlockReason: text("UnlockReason"),
+    Note: text("Note"),
+    ModifiedDate: text("ModifiedDate").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.ComCode, t.Period] }), index("IX_AccountingPeriod_Status").on(t.Status)],
+);
+
+/** Lịch sử khóa / mở khóa kỳ — chỉ thêm, không sửa/xóa */
+export const accountingPeriodLog = sqliteTable(
+  "AccountingPeriodLog",
+  {
+    ID: integer("ID").primaryKey({ autoIncrement: true }),
+    ComCode: text("ComCode").notNull(),
+    Period: text("Period").notNull(),
+    Action: text("Action").notNull(), // LOCK | UNLOCK
+    FromStatus: text("FromStatus").notNull(),
+    ToStatus: text("ToStatus").notNull(),
+    ActorName: text("ActorName").notNull(),
+    Reason: text("Reason"),
+    /** JSON việc dở của kỳ tại thời điểm thao tác (event NEW/ERROR, raw chưa build, lệch Nợ/Có…) */
+    ChecksSnapshot: text("ChecksSnapshot"),
+    CreatedAt: text("CreatedAt").notNull(),
+  },
+  (t) => [index("IX_AccountingPeriodLog_Period").on(t.ComCode, t.Period)],
+);
+
 // ───────────────────────────── Types ─────────────────────────────
 
 export type PartnerRow = typeof partners.$inferSelect;
@@ -482,3 +526,5 @@ export type GLTransRow = typeof glTrans.$inferSelect;
 export type GLTransInsert = typeof glTrans.$inferInsert;
 export type ExceptionLogRow = typeof exceptionLog.$inferSelect;
 export type ExceptionLogInsert = typeof exceptionLog.$inferInsert;
+export type AccountingPeriodRow = typeof accountingPeriod.$inferSelect;
+export type AccountingPeriodLogRow = typeof accountingPeriodLog.$inferSelect;

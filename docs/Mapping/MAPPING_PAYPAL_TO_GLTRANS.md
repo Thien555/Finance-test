@@ -120,7 +120,10 @@ trùng** (kiểu Hold → Cancel Hold dùng chung mã). Bộ ba thì duy nhất 
 > **Quy tắc bắt buộc:** `SourceKey` **không được chứa cột người dùng điền tay** (`JournalType`,
 > `PartnerCode`, `StoreName`). Nhờ vậy khi ai đó sửa tay cột `JournalType` rồi import lại, `RowHash` đổi
 > nhưng `SourceKey` giữ nguyên → hệ thống nhận ra đúng dòng cũ và **chặn lại** nếu dòng đó đã build/post
-> (báo *"Unbuild PAYPAL trước khi import lại"*). Đây là cơ chế chống ghi sổ trùng của nguồn này.
+> (dòng còn event đã ghi sổ: *"Dòng đã ghi sổ (event …, POSTED) … → Unpost + Unbuild PAYPAL ComCode X kỳ P trước khi import
+> lại"*; còn event chưa post: *"… → Unbuild PAYPAL ComCode X kỳ P trước khi import lại"*). Đây là cơ chế chống ghi sổ trùng của
+> nguồn này. Unbuild không kèm Unpost giữ dòng ở `BUILT` khi event POSTED của nó còn (guide §6.11.6); dòng vẫn lọt tới Build
+> (vd đổi danh mục JournalType) thì event đã ghi sổ của dòng chặn bản mới bằng `POSTED_KEY_CHANGED`.
 
 ### Quy ước dấu của PayPal
 
